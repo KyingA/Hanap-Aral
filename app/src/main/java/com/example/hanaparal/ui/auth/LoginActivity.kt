@@ -46,21 +46,73 @@ import androidx.compose.ui.unit.sp
 import com.example.hanaparal.R
 import com.example.hanaparal.ui.profile.ProfileActivity
 import com.example.hanaparal.ui.theme.*
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 
 class LoginActivity : ComponentActivity() {
+
+    private lateinit var auth: FirebaseAuth
+    private lateinit var googleSignInClient: GoogleSignInClient
+
+    private val googleSignInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                firebaseAuthWithGoogle(account.idToken!!)
+            } catch (e: ApiException) {
+                Log.w("LoginActivity", "Google sign in failed", e)
+                Toast.makeText(this, "Sign in failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        auth = FirebaseAuth.getInstance()
+        
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        googleSignInClient = GoogleSignIn.getClient(this, gso)
+
         enableEdgeToEdge()
         setContent {
             HanapAralTheme(dynamicColor = false) {
-                SignInScreen()
+                SignInScreen(onGoogleSignInClick = {
+                    val signInIntent = googleSignInClient.signInIntent
+                    googleSignInLauncher.launch(signInIntent)
+                })
             }
         }
+    }
+
+    private fun firebaseAuthWithGoogle(idToken: String) {
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        auth.signInWithCredential(credential)
+            .addOnCompleteListener(this) { task ->
+                if (task.isSuccessful) {
+                    // Navigate to MainActivity directly
+                    startActivity(Intent(this, com.example.hanaparal.MainActivity::class.java))
+                    finish()
+                } else {
+                    Toast.makeText(this, "Authentication Failed.", Toast.LENGTH_SHORT).show()
+                }
+            }
     }
 }
 
 @Composable
-fun SignInScreen() {
+fun SignInScreen(onGoogleSignInClick: () -> Unit = {}) {
     val topGradient = Brush.verticalGradient(
         colors = listOf(
             Color(0xFFE8EDF5),
@@ -218,11 +270,8 @@ fun SignInScreen() {
                     Spacer(modifier = Modifier.height(32.dp))
 
                     // ── Google Sign-In Button ──
-                    val context = LocalContext.current
                     Button(
-                        onClick = {
-                            context.startActivity(Intent(context, ProfileActivity::class.java))
-                        },
+                        onClick = onGoogleSignInClick,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),

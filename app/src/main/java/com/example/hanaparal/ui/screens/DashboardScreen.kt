@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.materialIcon
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -80,8 +81,17 @@ fun DashboardScreen() {
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFEADBCE))
-                    )
+                            .background(Color(0xFFB6E3FA)),
+                        contentAlignment = Alignment.Center
+
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Profile",
+                            tint = DarkNavy,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
 
@@ -98,7 +108,7 @@ fun DashboardScreen() {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Hello, Alex!",
+                    text = "Hello, King!",
                     color = DarkNavy,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold
@@ -215,6 +225,30 @@ fun DashboardScreen() {
                         members = "8",
                         time = "Fri, 2PM",
                         progress = 0.3f
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    GroupCard(
+                        iconString = "PY",
+                        iconBg = Color(0xFFFFEBEE),
+                        status = "CLOSED",
+                        statusBg = Color(0xFFFFCDD2),
+                        statusColor = Color(0xFFB71C1C),
+                        title = "Python Programming",
+                        members = "4",
+                        time = "Sat, 10AM",
+                        progress = 0.9f
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    GroupCard(
+                        iconString = "DSA",
+                        iconBg = Color(0xFFE8F5E9),
+                        status = "CLOSED",
+                        statusBg = Color(0xFFC8E6C9),
+                        statusColor = Color(0xFF2E7D32),
+                        title = "Data Structures 101",
+                        members = "12",
+                        time = "Wed, 4PM",
+                        progress = 0.7f
                     )
                 }
             }
