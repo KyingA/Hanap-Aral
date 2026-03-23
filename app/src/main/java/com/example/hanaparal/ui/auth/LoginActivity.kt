@@ -69,8 +69,10 @@ class LoginActivity : ComponentActivity() {
                 firebaseAuthWithGoogle(account.idToken!!)
             } catch (e: ApiException) {
                 Log.w("LoginActivity", "Google sign in failed", e)
-                Toast.makeText(this, "Sign in failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Sign in failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
+        } else {
+            Toast.makeText(this, "Sign in cancelled", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -78,6 +80,12 @@ class LoginActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         auth = FirebaseAuth.getInstance()
+        
+        if (auth.currentUser != null) {
+            startActivity(Intent(this, com.example.hanaparal.MainActivity::class.java))
+            finish()
+            return
+        }
         
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
@@ -101,8 +109,8 @@ class LoginActivity : ComponentActivity() {
         auth.signInWithCredential(credential)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    // Navigate to MainActivity directly
-                    startActivity(Intent(this, com.example.hanaparal.MainActivity::class.java))
+                    // Navigate to ProfileActivity
+                    startActivity(Intent(this, com.example.hanaparal.ui.profile.ProfileActivity::class.java))
                     finish()
                 } else {
                     Toast.makeText(this, "Authentication Failed.", Toast.LENGTH_SHORT).show()
