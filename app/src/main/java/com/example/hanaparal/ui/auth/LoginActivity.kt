@@ -2,13 +2,13 @@ package com.example.hanaparal.ui.auth
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -43,24 +42,58 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.example.hanaparal.R
 import com.example.hanaparal.ui.profile.ProfileActivity
 import com.example.hanaparal.ui.theme.*
 
-class LoginActivity : ComponentActivity() {
+class LoginActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             HanapAralTheme(dynamicColor = false) {
-                SignInScreen()
+                SignInScreen(onSignInClick = {
+                    showBiometricPrompt()
+                })
             }
         }
+    }
+
+    private fun showBiometricPrompt() {
+        val executor = ContextCompat.getMainExecutor(this)
+        val biometricPrompt = BiometricPrompt(this, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    Toast.makeText(applicationContext, "Authentication error: $errString", Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    Toast.makeText(applicationContext, "Authentication succeeded!", Toast.LENGTH_SHORT).show()
+                    startActivity(Intent(this@LoginActivity, ProfileActivity::class.java))
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    Toast.makeText(applicationContext, "Authentication failed", Toast.LENGTH_SHORT).show()
+                }
+            })
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Biometric Login")
+            .setSubtitle("Log in using your biometric credential")
+            .setNegativeButtonText("Cancel")
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
     }
 }
 
 @Composable
-fun SignInScreen() {
+fun SignInScreen(onSignInClick: () -> Unit = {}) {
     val topGradient = Brush.verticalGradient(
         colors = listOf(
             Color(0xFFE8EDF5),
@@ -81,9 +114,6 @@ fun SignInScreen() {
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // ═══════════════════════════════════════
-            // ──  TOP HERO SECTION
-            // ═══════════════════════════════════════
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -91,7 +121,6 @@ fun SignInScreen() {
                     .background(topGradient),
                 contentAlignment = Alignment.Center
             ) {
-                // Decorative blurred orbs
                 Box(
                     modifier = Modifier
                         .size(220.dp)
@@ -154,9 +183,6 @@ fun SignInScreen() {
                 }
             }
 
-            // ═══════════════════════════════════════
-            // ──  BOTTOM CARD SECTION
-            // ═══════════════════════════════════════
             Surface(
                 modifier = Modifier
                     .fillMaxWidth(),
@@ -172,7 +198,6 @@ fun SignInScreen() {
                         .padding(top = 36.dp, bottom = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // ── Heading ──
                     Text(
                         text = buildAnnotatedString {
                             withStyle(
@@ -203,7 +228,6 @@ fun SignInScreen() {
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // ── Subtitle ──
                     Text(
                         text = "Join curated study groups designed\nfor focused academic excellence.",
                         style = TextStyle(
@@ -217,12 +241,8 @@ fun SignInScreen() {
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // ── Google Sign-In Button ──
-                    val context = LocalContext.current
                     Button(
-                        onClick = {
-                            context.startActivity(Intent(context, ProfileActivity::class.java))
-                        },
+                        onClick = onSignInClick,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -254,7 +274,7 @@ fun SignInScreen() {
                             }
                             Spacer(modifier = Modifier.width(14.dp))
                             Text(
-                                text = "Continue with Google",
+                                text = "Continue with Biometrics",
                                 color = Color.White,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -265,7 +285,6 @@ fun SignInScreen() {
 
                     Spacer(modifier = Modifier.height(18.dp))
 
-                    // ── School Email Link ──
                     Text(
                         text = "Use school email address",
                         color = MediumNavy,
@@ -281,7 +300,6 @@ fun SignInScreen() {
 
                     Spacer(modifier = Modifier.height(28.dp))
 
-                    // ── Divider ──
                     Box(
                         modifier = Modifier
                             .width(40.dp)
@@ -292,7 +310,6 @@ fun SignInScreen() {
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // ── Footer ──
                     Text(
                         text = buildAnnotatedString {
                             withStyle(style = SpanStyle(color = FooterGray)) {
