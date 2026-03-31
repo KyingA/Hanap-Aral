@@ -36,7 +36,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hanaparal.MainActivity
 import com.example.hanaparal.R
+import com.example.hanaparal.model.UserProfile
 import com.example.hanaparal.ui.theme.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 class ProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,7 +61,7 @@ class ProfileActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun CreateProfileScreen(onComplete: () -> Unit = {}) {
+fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel = viewModel()) {
     var fullName by remember { mutableStateOf("") }
     var selectedProgram by remember { mutableStateOf("") }
     var programExpanded by remember { mutableStateOf(false) }
@@ -67,6 +71,20 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}) {
     var quietStudy by remember { mutableStateOf(true) }
     var peerTeaching by remember { mutableStateOf(false) }
     var projectBased by remember { mutableStateOf(false) }
+
+    val isLoading by viewModel.isLoading.collectAsState()
+    val saveStatus by viewModel.saveStatus.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(saveStatus) {
+        if (saveStatus == true) {
+            viewModel.resetSaveStatus()
+            onComplete()
+        } else if (saveStatus == false) {
+            viewModel.resetSaveStatus()
+            Toast.makeText(context, "Failed to save profile. Check Firestore Rules or your internet connection.", Toast.LENGTH_LONG).show()
+        }
+    }
 
     val programs = listOf(
         "BS Computer Science",
@@ -296,7 +314,20 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}) {
 
         // Button
         Button(
-            onClick = onComplete,
+            onClick = {
+                if (fullName.isNotBlank()) {
+                    val profile = UserProfile(
+                        fullname = fullName,
+                        program = selectedProgram,
+                        email = email,
+                        quietStudy = quietStudy,
+                        peerTeaching = peerTeaching,
+                        projectBased = projectBased
+                    )
+                    viewModel.saveUserProfile(profile)
+                }
+            },
+            enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -308,19 +339,23 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}) {
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "Complete Profile",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    Icons.Default.ArrowForward,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text(
+                        "Complete Profile",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 

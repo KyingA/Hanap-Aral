@@ -10,9 +10,9 @@
               <option name="connection">
                 <ConnectionSetting>
                   <option name="appId" value="com.example.hanaparal" />
-                  <option name="mobileSdkAppId" value="1:554134398407:android:135ea352b095f3b71d65e2" />
-                  <option name="projectId" value="hanaparal-cec00" />
-                  <option name="projectNumber" value="554134398407" />
+                  <option name="mobileSdkAppId" value="1:151252341250:android:524e2dab722d6432d70d1b" />
+                  <option name="projectId" value="hanaparal-a864f" />
+                  <option name="projectNumber" value="151252341250" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

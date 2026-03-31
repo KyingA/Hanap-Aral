@@ -32,20 +32,55 @@ import androidx.compose.ui.unit.sp
 import com.example.hanaparal.R
 import com.example.hanaparal.ui.theme.DarkNavy
 import com.example.hanaparal.ui.theme.HanapAralTheme
+import androidx.compose.runtime.*
+import com.example.hanaparal.ui.auth.LoginActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.hanaparal.model.UserProfile
+import com.example.hanaparal.ui.profile.ProfileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(profileViewModel: ProfileViewModel = viewModel()) {
+    var selectedTab by remember { mutableStateOf(0) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val userProfile by profileViewModel.userProfile.collectAsState()
+
+    LaunchedEffect(Unit) {
+        profileViewModel.fetchUserProfile()
+    }
+    
     Scaffold(
         containerColor = Color(0xFFF8F9FA),
-        bottomBar = { DashboardBottomNav() }
+        bottomBar = { DashboardBottomNav(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
+        when (selectedTab) {
+            0 -> DashboardContent(paddingValues, userProfile, onProfileClick = { selectedTab = 2 })
+            // 1 -> GroupsScreen(paddingValues)
+            2 -> ProfileScreen(
+                paddingValues = paddingValues,
+                userProfile = userProfile,
+                onLogoutClick = {
+                    com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                    val intent = android.content.Intent(context, com.example.hanaparal.ui.auth.LoginActivity::class.java)
+                    intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    context.startActivity(intent)
+                }
+            )
+            else -> DashboardContent(paddingValues, userProfile, onProfileClick = { selectedTab = 2 })
+        }
+    }
+}
+
+@Composable
+fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, onProfileClick: () -> Unit = {}) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .verticalScroll(rememberScrollState())
+    ) {
             // Top Bar Area
             Row(
                 modifier = Modifier
@@ -81,7 +116,8 @@ fun DashboardScreen() {
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFB6E3FA)),
+                            .background(Color(0xFFB6E3FA))
+                            .clickable { onProfileClick() },
                         contentAlignment = Alignment.Center
 
                     ) {
@@ -107,8 +143,9 @@ fun DashboardScreen() {
                     letterSpacing = 1.5.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                val firstName = userProfile?.fullname?.split(" ")?.get(0) ?: "User"
                 Text(
-                    text = "Hello, King!",
+                    text = "Hello, $firstName!",
                     color = DarkNavy,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold
@@ -267,7 +304,7 @@ fun DashboardScreen() {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         SessionRow("24", "OCT", "Algorithm Review", "4:30 PM • Library Room 4", Icons.Default.KeyboardArrowRight)
-                        Divider(color = Color(0xFFF3F4F6), modifier = Modifier.padding(vertical = 12.dp))
+                        HorizontalDivider(color = Color(0xFFF3F4F6), modifier = Modifier.padding(vertical = 12.dp))
                         SessionRow("26", "OCT", "Calculus Mock Exam", "10:00 AM • Zoom", Icons.Default.Videocam)
                         Spacer(modifier = Modifier.height(16.dp))
                         Surface(
@@ -339,7 +376,6 @@ fun DashboardScreen() {
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
-}
 
 @Composable
 fun GroupCard(
@@ -508,7 +544,7 @@ fun SuggestedCard(
 }
 
 @Composable
-fun DashboardBottomNav() {
+fun DashboardBottomNav(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     Surface(
         color = Color.White,
         modifier = Modifier.fillMaxWidth(),
@@ -521,26 +557,53 @@ fun DashboardBottomNav() {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                color = Color(0xFFDBEAFE),
-                shape = RoundedCornerShape(12.dp)
+            NavItem(
+                icon = Icons.Default.Home,
+                label = "HOME",
+                isSelected = selectedTab == 0,
+                onClick = { onTabSelected(0) }
+            )
+            NavItem(
+                icon = Icons.Default.Person,
+                label = "GROUPS",
+                isSelected = selectedTab == 1,
+                onClick = { onTabSelected(1) }
+            )
+            NavItem(
+                icon = Icons.Default.AccountCircle,
+                label = "PROFILE",
+                isSelected = selectedTab == 2,
+                onClick = { onTabSelected(2) }
+            )
+        }
+    }
+}
+
+@Composable
+fun NavItem(icon: ImageVector, label: String, isSelected: Boolean, onClick: () -> Unit) {
+    if (isSelected) {
+        Surface(
+            color = Color(0xFFDBEAFE),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.clickable { onClick() }
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                ) {
-                    Icon(Icons.Default.Home, contentDescription = "Home", tint = Color(0xFF1E3A8A), modifier = Modifier.size(24.dp))
-                    Text("HOME", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E3A8A))
-                }
+                Icon(icon, contentDescription = label, tint = Color(0xFF1E3A8A), modifier = Modifier.size(24.dp))
+                Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E3A8A))
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { }) {
-                Icon(Icons.Default.Person, contentDescription = "Groups", tint = Color(0xFF6B7280), modifier = Modifier.size(24.dp))
-                Text("GROUPS", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF6B7280))
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { }) {
-                Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = Color(0xFF6B7280), modifier = Modifier.size(24.dp))
-                Text("PROFILE", fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF6B7280))
-            }
+        }
+    } else {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .clickable { onClick() }
+        ) {
+            Icon(icon, contentDescription = label, tint = Color(0xFF6B7280), modifier = Modifier.size(24.dp))
+            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFF6B7280))
         }
     }
 }
