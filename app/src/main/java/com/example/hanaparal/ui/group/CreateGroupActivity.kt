@@ -4,11 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hanaparal.ui.theme.HanapAralTheme
@@ -33,6 +35,7 @@ fun CreateGroupScreen(
     var name by remember { mutableStateOf("") }
     var subject by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var maxMembers by remember { mutableStateOf("20") }
 
     Scaffold(
         topBar = {
@@ -62,7 +65,7 @@ fun CreateGroupScreen(
             OutlinedTextField(
                 value = subject,
                 onValueChange = { subject = it },
-                label = { Text("Subject") },
+                label = { Text("Subject (e.g., CS CORE)") },
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
@@ -72,16 +75,28 @@ fun CreateGroupScreen(
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3
             )
+            OutlinedTextField(
+                value = maxMembers,
+                onValueChange = { if (it.all { char -> char.isDigit() }) maxMembers = it },
+                label = { Text("Member Limit") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
             
             Spacer(modifier = Modifier.weight(1f))
             
             Button(
                 onClick = { 
-                    viewModel.createGroup(name, subject, description, "currentUser123")
+                    viewModel.createGroup(
+                        name = name, 
+                        subject = subject, 
+                        description = description,
+                        maxMembers = maxMembers.toIntOrNull() ?: 20
+                    )
                     onBack() 
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = name.isNotBlank() && subject.isNotBlank()
+                enabled = name.isNotBlank() && subject.isNotBlank() && maxMembers.isNotBlank()
             ) {
                 Text("Create Group")
             }

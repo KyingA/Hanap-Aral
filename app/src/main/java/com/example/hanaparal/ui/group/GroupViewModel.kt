@@ -16,6 +16,9 @@ class GroupViewModel(private val repository: GroupRepository = GroupRepository()
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // Mock Current User ID
+    val currentUserId = "user1" 
+
     init {
         loadGroups()
     }
@@ -28,24 +31,26 @@ class GroupViewModel(private val repository: GroupRepository = GroupRepository()
         }
     }
 
-    fun createGroup(name: String, subject: String, description: String, adminId: String) {
+    fun createGroup(name: String, subject: String, description: String, maxMembers: Int = 20) {
         val newGroup = StudyGroup(
-            id = "", // Will be assigned by repository
+            id = "", 
             name = name,
             subject = subject,
             description = description,
-            adminId = adminId,
-            memberIds = listOf(adminId),
-            maxMembers = 10 // Default max members
+            adminId = currentUserId, // Automatic admin assignment (creator)
+            memberIds = listOf(currentUserId), // Creator is the first member
+            maxMembers = maxMembers,
+            schedule = "TBD",
+            status = "ACTIVE"
         )
         viewModelScope.launch {
             repository.createGroup(newGroup)
         }
     }
 
-    fun joinGroup(groupId: String, userId: String) {
+    fun joinGroup(groupId: String) {
         viewModelScope.launch {
-            val result = repository.joinGroup(groupId, userId)
+            val result = repository.joinGroup(groupId, currentUserId)
             if (result.isFailure) {
                 _errorMessage.value = result.exceptionOrNull()?.message
             }

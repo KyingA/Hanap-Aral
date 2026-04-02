@@ -1,34 +1,44 @@
 package com.example.hanaparal
 
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.hanaparal.data.model.StudyGroup
+import com.example.hanaparal.ui.group.CreateGroupActivity
+import com.example.hanaparal.ui.group.GroupDetailActivity
+import com.example.hanaparal.ui.group.GroupListActivity
+import com.example.hanaparal.ui.group.GroupViewModel
+import com.example.hanaparal.ui.profile.ProfileActivity
 import com.example.hanaparal.ui.theme.*
 
 class MainActivity : ComponentActivity() {
@@ -37,18 +47,53 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             HanapAralTheme(dynamicColor = false) {
-                DashboardScreen()
+                DashboardScreen(
+                    onCreateClick = {
+                        startActivity(Intent(this, CreateGroupActivity::class.java))
+                    },
+                    onFindGroupClick = {
+                        startActivity(Intent(this, GroupListActivity::class.java))
+                    },
+                    onProfileClick = {
+                        startActivity(Intent(this, ProfileActivity::class.java))
+                    },
+                    onGroupClick = { groupId ->
+                        val intent = Intent(this, GroupDetailActivity::class.java)
+                        intent.putExtra("GROUP_ID", groupId)
+                        startActivity(intent)
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(
+    viewModel: GroupViewModel = viewModel(),
+    onCreateClick: () -> Unit = {},
+    onFindGroupClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onGroupClick: (String) -> Unit = {}
+) {
+    val groups by viewModel.groups.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val context = LocalContext.current
+    
+    val myGroups = groups.filter { it.memberIds.contains(viewModel.currentUserId) }
+    val suggestedGroups = groups.filter { !it.memberIds.contains(viewModel.currentUserId) }
+
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearError()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F7FA))
+            .background(LightGrayBg)
     ) {
         Column(
             modifier = Modifier
@@ -56,9 +101,9 @@ fun DashboardScreen() {
                 .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = 20.dp)
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // ── Top Bar ──
             Row(
@@ -71,255 +116,349 @@ fun DashboardScreen() {
                         text = "HanapAral",
                         style = TextStyle(
                             color = DarkNavy,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif,
-                            letterSpacing = 1.sp
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.ExtraBold
                         )
                     )
                     Text(
-                        text = "Welcome back! 👋",
+                        text = "Connect. Study. Excel.",
                         color = SubtitleGray,
-                        fontSize = 14.sp
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE8ECF0)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Profile",
-                        tint = Color(0xFFB0B8C4),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ── Search Bar ──
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White,
-                shadowElevation = 2.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = Color(0xFFB0B8C4),
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Search study groups...",
-                        color = Color(0xFFB0B8C4),
-                        fontSize = 15.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // ── Quick Stats ──
-            Text(
-                text = "Overview",
-                color = DarkNavy,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Study Groups",
-                    value = "3",
-                    icon = Icons.Filled.Person,
-                    color = Color(0xFF3B5998)
-                )
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Subjects",
-                    value = "5",
-                    icon = Icons.Filled.Star,
-                    color = Color(0xFF2D8B4E)
-                )
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Hours",
-                    value = "12",
-                    icon = Icons.Filled.DateRange,
-                    color = Color(0xFFD4791C)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // ── My Study Groups ──
-            Text(
-                text = "My Study Groups",
-                color = DarkNavy,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            StudyGroupCard(
-                name = "Data Structures Review",
-                members = "5 members",
-                schedule = "Mon, Wed • 3:00 PM",
-                color = Color(0xFF3B5998)
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            StudyGroupCard(
-                name = "Calculus Study Group",
-                members = "4 members",
-                schedule = "Tue, Thu • 10:00 AM",
-                color = Color(0xFF2D8B4E)
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            StudyGroupCard(
-                name = "English Literature",
-                members = "6 members",
-                schedule = "Fri • 1:00 PM",
-                color = Color(0xFFD4791C)
-            )
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // ── Upcoming Sessions ──
-            Text(
-                text = "Upcoming Sessions",
-                color = DarkNavy,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = DarkNavy
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp)
-                ) {
-                    Text(
-                        text = "Data Structures Review",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Today at 3:00 PM • Room 201",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 13.sp
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Button(
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
                         onClick = { /* TODO */ },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White
-                        ),
-                        modifier = Modifier.height(40.dp)
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(IconBgLight)
+                            .size(44.dp)
                     ) {
-                        Text(
-                            text = "Join Session",
-                            color = DarkNavy,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = DarkNavy, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Brush.linearGradient(listOf(PremiumPurple, Color(0xFF818CF8))))
+                            .clickable { onProfileClick() }
+                            .shadow(4.dp, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("AA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+
+            // ── Greeting ──
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                color = DarkNavy,
+                shadowElevation = 8.dp
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Text(
+                        text = "Welcome back, Anthony! 👋",
+                        style = TextStyle(
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (myGroups.isEmpty()) "Ready to ace your subjects? Join a group now!" else "You're currently in ${myGroups.size} active study groups. Keep going!",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // ── Action Row ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                ActionCard(
+                    title = "Find Group",
+                    subtitle = "Search by subject",
+                    icon = Icons.Default.Search,
+                    containerColor = SoftPurple,
+                    contentColor = PremiumPurple,
+                    onClick = onFindGroupClick,
+                    modifier = Modifier.weight(1f)
+                )
+                ActionCard(
+                    title = "Create",
+                    subtitle = "Start a group",
+                    icon = Icons.Default.Add,
+                    containerColor = LightGreen,
+                    contentColor = PrimaryGreen,
+                    onClick = onCreateClick,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // ── My Groups ──
+            SectionHeader(title = "My Groups", count = myGroups.size, onSeeAll = onFindGroupClick)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (myGroups.isEmpty()) {
+                EmptyStateCard(message = "You haven't joined any groups yet.")
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    myGroups.forEach { group ->
+                        MyGroupCard(group = group, onClick = { onGroupClick(group.id) })
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // ── Suggested for You ──
+            SectionHeader(title = "Suggested for You")
+            Text(
+                text = "Personalized for your academic success",
+                color = SubtitleGray,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            suggestedGroups.forEach { group ->
+                SuggestedGroupCard(
+                    group = group,
+                    onJoinClick = { 
+                        viewModel.joinGroup(group.id)
+                        Toast.makeText(context, "Joining ${group.name}...", Toast.LENGTH_SHORT).show()
+                    },
+                    onCardClick = { onGroupClick(group.id) }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+            
+            Spacer(modifier = Modifier.height(120.dp))
+        }
+
+        // ── Bottom Navigation ──
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 20.dp)
+                .shadow(24.dp, RoundedCornerShape(32.dp)),
+            shape = RoundedCornerShape(32.dp),
+            color = Color.White
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(vertical = 12.dp, horizontal = 8.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavItem(icon = Icons.Default.Home, label = "Home", isSelected = true, onClick = {})
+                NavItem(icon = Icons.Default.Search, label = "Explore", onClick = onFindGroupClick)
+                NavItem(icon = Icons.Default.Person, label = "Profile", onClick = onProfileClick)
+            }
         }
     }
 }
 
 @Composable
-fun StatCard(
-    modifier: Modifier = Modifier,
+fun ActionCard(
     title: String,
-    value: String,
+    subtitle: String,
     icon: ImageVector,
-    color: Color
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        shadowElevation = 2.dp
+        onClick = onClick,
+        modifier = modifier.height(110.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = containerColor,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalArrangement = Arrangement.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(color.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = color,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = value,
-                color = DarkNavy,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = title, color = contentColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(text = subtitle, color = contentColor.copy(alpha = 0.6f), fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+fun SectionHeader(title: String, count: Int? = null, onSeeAll: (() -> Unit)? = null) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = title,
-                color = SubtitleGray,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
+                color = DarkNavy,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            if (count != null) {
+                Spacer(modifier = Modifier.width(10.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = SoftPurple,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(text = count.toString(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PremiumPurple)
+                    }
+                }
+            }
+        }
+        if (onSeeAll != null) {
+            Text(
+                text = "View All",
+                modifier = Modifier.clickable { onSeeAll() },
+                color = PremiumPurple,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
             )
         }
     }
 }
 
 @Composable
-fun StudyGroupCard(
-    name: String,
-    members: String,
-    schedule: String,
-    color: Color
-) {
+fun EmptyStateCard(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = IconBgLight,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+    ) {
+        Text(
+            text = message,
+            modifier = Modifier.padding(32.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            color = SubtitleGray,
+            fontSize = 14.sp
+        )
+    }
+}
+
+@Composable
+fun NavItem(icon: ImageVector, label: String, isSelected: Boolean = false, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (isSelected) PremiumPurple else SubtitleGray,
+            modifier = Modifier.size(26.dp)
+        )
+        if (isSelected) {
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = PremiumPurple
+            )
+        }
+    }
+}
+
+@Composable
+fun MyGroupCard(group: StudyGroup, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.width(280.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = SoftPurple
+                ) {
+                    Text(
+                        text = group.subject,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = PremiumPurple
+                    )
+                }
+                Icon(Icons.Default.MoreVert, contentDescription = null, tint = SubtitleGray)
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = group.name,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+                color = DarkNavy,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(20.dp), tint = SubtitleGray)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "${group.memberIds.size}/${group.maxMembers} Students",
+                    fontSize = 14.sp,
+                    color = SubtitleGray,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            val progress = group.memberIds.size.toFloat() / group.maxMembers.toFloat()
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(CircleShape),
+                color = PremiumPurple,
+                trackColor = SoftPurple
+            )
+        }
+    }
+}
+
+@Composable
+fun SuggestedGroupCard(group: StudyGroup, onJoinClick: () -> Unit, onCardClick: () -> Unit) {
+    Surface(
+        onClick = onCardClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
         color = Color.White,
         shadowElevation = 2.dp
     ) {
@@ -329,32 +468,43 @@ fun StudyGroupCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(color.copy(alpha = 0.1f)),
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(SoftPurple),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Person,
-                    contentDescription = name,
-                    tint = color,
-                    modifier = Modifier.size(24.dp)
+                Text(
+                    text = group.name.take(1).uppercase(),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = PremiumPurple
                 )
             }
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = name,
-                    color = DarkNavy,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
+                    text = group.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = DarkNavy
                 )
-                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "$members • $schedule",
+                    text = group.subject,
+                    fontSize = 13.sp,
                     color = SubtitleGray,
-                    fontSize = 12.sp
+                    fontWeight = FontWeight.Medium
                 )
+            }
+            Button(
+                onClick = onJoinClick,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PremiumPurple,
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+            ) {
+                Text("Join", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         }
     }

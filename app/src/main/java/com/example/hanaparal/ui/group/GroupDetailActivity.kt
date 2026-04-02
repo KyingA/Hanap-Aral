@@ -5,6 +5,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,7 +15,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hanaparal.ui.theme.HanapAralTheme
 
@@ -51,7 +52,14 @@ fun GroupDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Group Details") })
+            TopAppBar(
+                title = { Text("Group Details") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
         }
     ) { padding ->
         Column(
@@ -95,24 +103,31 @@ fun GroupDetailScreen(
                             Text(text = "${group.memberIds.size} / ${group.maxMembers}")
                         }
                         
-                        // Progress bar for member limit
                         LinearProgressIndicator(
                             progress = { group.memberIds.size.toFloat() / group.maxMembers.toFloat() },
                             modifier = Modifier.width(100.dp),
                         )
                     }
                 }
+                
+                if (group.adminId == viewModel.currentUserId) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "You are the Admin of this group",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
 
                 Spacer(modifier = Modifier.weight(1f))
 
                 // Join Button Logic
-                val currentUserId = "user456" // This should come from Auth
-                val isMember = group.memberIds.contains(currentUserId)
+                val isMember = group.memberIds.contains(viewModel.currentUserId)
 
                 Button(
                     onClick = { 
                         if (!isMember) {
-                            viewModel.joinGroup(group.id, currentUserId)
+                            viewModel.joinGroup(group.id)
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

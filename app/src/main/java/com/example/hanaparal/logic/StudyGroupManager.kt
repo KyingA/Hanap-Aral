@@ -79,8 +79,9 @@ class StudyGroupManager {
         val group = studyGroups.find { it.id == groupId }
 
         return if (group != null && group.adminId == userId) {
-            group.name = newName
-            group.subject = newSubject
+            val updatedGroup = group.copy(name = newName, subject = newSubject)
+            val index = studyGroups.indexOf(group)
+            studyGroups[index] = updatedGroup
             "Group updated"
         } else {
             "Only admin can edit"
