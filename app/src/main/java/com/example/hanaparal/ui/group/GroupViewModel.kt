@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class GroupViewModel(private val repository: GroupRepository = GroupRepository()) : ViewModel() {
+class GroupViewModel(private val repository: GroupRepository = GroupRepository) : ViewModel() {
     private val _groups = MutableStateFlow<List<StudyGroup>>(emptyList())
     val groups: StateFlow<List<StudyGroup>> = _groups.asStateFlow()
 
@@ -31,16 +31,16 @@ class GroupViewModel(private val repository: GroupRepository = GroupRepository()
         }
     }
 
-    fun createGroup(name: String, subject: String, description: String, maxMembers: Int = 20) {
+    fun createGroup(name: String, subject: String, description: String, schedule: String, maxMembers: Int = 20) {
         val newGroup = StudyGroup(
             id = "", 
             name = name,
             subject = subject,
             description = description,
-            adminId = currentUserId, // Automatic admin assignment (creator)
-            memberIds = listOf(currentUserId), // Creator is the first member
+            adminId = currentUserId,
+            memberIds = listOf(currentUserId),
             maxMembers = maxMembers,
-            schedule = "TBD",
+            schedule = schedule,
             status = "ACTIVE"
         )
         viewModelScope.launch {
@@ -51,6 +51,33 @@ class GroupViewModel(private val repository: GroupRepository = GroupRepository()
     fun joinGroup(groupId: String) {
         viewModelScope.launch {
             val result = repository.joinGroup(groupId, currentUserId)
+            if (result.isFailure) {
+                _errorMessage.value = result.exceptionOrNull()?.message
+            }
+        }
+    }
+
+    fun leaveGroup(groupId: String) {
+        viewModelScope.launch {
+            val result = repository.leaveGroup(groupId, currentUserId)
+            if (result.isFailure) {
+                _errorMessage.value = result.exceptionOrNull()?.message
+            }
+        }
+    }
+
+    fun deleteGroup(groupId: String) {
+        viewModelScope.launch {
+            val result = repository.deleteGroup(groupId)
+            if (result.isFailure) {
+                _errorMessage.value = result.exceptionOrNull()?.message
+            }
+        }
+    }
+
+    fun updateGroup(updatedGroup: StudyGroup) {
+        viewModelScope.launch {
+            val result = repository.updateGroup(updatedGroup)
             if (result.isFailure) {
                 _errorMessage.value = result.exceptionOrNull()?.message
             }

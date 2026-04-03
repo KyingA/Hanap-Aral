@@ -7,6 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +43,7 @@ fun GroupDetailScreen(
     val group = groups.find { it.id == groupId }
     val error by viewModel.errorMessage.collectAsState()
     val context = LocalContext.current
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Observe error message
     LaunchedEffect(error) {
@@ -50,6 +53,28 @@ fun GroupDetailScreen(
         }
     }
 
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Group") },
+            text = { Text("Are you sure you want to delete this group? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteGroup(groupId)
+                    showDeleteDialog = false
+                    onBack()
+                }) {
+                    Text("Delete", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -57,6 +82,16 @@ fun GroupDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    if (group?.adminId == viewModel.currentUserId) {
+                        IconButton(onClick = { /* TODO: Implement Edit */ }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                        }
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                        }
                     }
                 }
             )
@@ -81,6 +116,10 @@ fun GroupDetailScreen(
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(text = "Schedule: ${group.schedule}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                
+                Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(text = group.description, style = MaterialTheme.typography.bodyLarge)
                 
@@ -121,31 +160,30 @@ fun GroupDetailScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Join Button Logic
                 val isMember = group.memberIds.contains(viewModel.currentUserId)
 
-                Button(
-                    onClick = { 
-                        if (!isMember) {
-                            viewModel.joinGroup(group.id)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isMember && group.memberIds.size < group.maxMembers,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isMember) Color.Gray else MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(
-                        text = when {
-                            isMember -> "Already a Member"
-                            group.memberIds.size >= group.maxMembers -> "Group Full"
-                            else -> "Join Study Group"
-                        }
-                    )
+                if (isMember) {
+                    OutlinedButton(
+                        onClick = { viewModel.leaveGroup(group.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
+                    ) {
+                        Text("Leave Group")
+                    }
+                } else {
+                    Button(
+                        onClick = { viewModel.joinGroup(group.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = group.memberIds.size < group.maxMembers
+                    ) {
+                        Text(
+                            text = if (group.memberIds.size >= group.maxMembers) "Group Full" else "Join Study Group"
+                        )
+                    }
                 }
             } else {
-                Text("Loading group details...")
+                Text("Group not found or deleted.")
+                Button(onClick = onBack) { Text("Go Back") }
             }
         }
     }
