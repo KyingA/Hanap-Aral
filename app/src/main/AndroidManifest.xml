@@ -45,6 +45,12 @@
             android:label="Create Group"
             android:theme="@style/Theme.HanapAral" />
 
+        <activity
+            android:name=".ui.admin.SuperAdminActivity"
+            android:exported="false"
+            android:label="Superuser Controls"
+            android:theme="@style/Theme.HanapAral" />
+
         <service
             android:name=".utils.MyFirebaseMessagingService"
             android:exported="false">
