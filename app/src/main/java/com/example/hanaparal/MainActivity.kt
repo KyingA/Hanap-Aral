@@ -1,11 +1,9 @@
 package com.example.hanaparal
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -26,7 +24,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.example.hanaparal.ui.theme.*
 
@@ -39,45 +36,16 @@ class MainActivity : FragmentActivity() {
         setContent {
             HanapAralTheme(dynamicColor = false) {
                 DashboardScreen(
-                    viewModel = viewModel,
-                    onSuperuserClick = {
-                        showBiometricPromptForAdmin()
-                    }
+                    viewModel = viewModel
                 )
             }
         }
-    }
-
-    private fun showBiometricPromptForAdmin() {
-        val executor = ContextCompat.getMainExecutor(this)
-        val biometricPrompt = BiometricPrompt(this, executor,
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    super.onAuthenticationSucceeded(result)
-                    viewModel.toggleAdminMode(true)
-                    Toast.makeText(this@MainActivity, "Admin Access Granted", Toast.LENGTH_SHORT).show()
-                }
-
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    super.onAuthenticationError(errorCode, errString)
-                    Toast.makeText(this@MainActivity, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
-                }
-            })
-
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Superuser Verification")
-            .setSubtitle("Authenticate to access admin controls")
-            .setNegativeButtonText("Cancel")
-            .build()
-
-        biometricPrompt.authenticate(promptInfo)
     }
 }
 
 @Composable
 fun DashboardScreen(
-    viewModel: MainViewModel,
-    onSuperuserClick: () -> Unit = {}
+    viewModel: MainViewModel
 ) {
     val announcementHeader by viewModel.announcementHeader
     val isGroupCreationEnabled by viewModel.isGroupCreationEnabled
@@ -125,7 +93,8 @@ fun DashboardScreen(
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onSuperuserClick) {
+                    // Admin toggle moved here for convenience since biometric prompt is removed
+                    IconButton(onClick = { viewModel.toggleAdminMode(!isAdminMode) }) {
                         Icon(
                             imageVector = if (isAdminMode) Icons.Default.Settings else Icons.Default.Lock,
                             contentDescription = "Admin",

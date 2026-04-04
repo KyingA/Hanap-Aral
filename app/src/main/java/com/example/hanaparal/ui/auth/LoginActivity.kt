@@ -17,8 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -54,9 +53,21 @@ class LoginActivity : FragmentActivity() {
         enableEdgeToEdge()
         setContent {
             HanapAralTheme(dynamicColor = false) {
+                var showAccountPicker by remember { mutableStateOf(false) }
+
                 SignInScreen(onSignInClick = {
-                    showBiometricPrompt()
+                    showAccountPicker = true
                 })
+
+                if (showAccountPicker) {
+                    AccountPickerSheet(
+                        onAccountSelected = {
+                            showAccountPicker = false
+                            showBiometricPrompt()
+                        },
+                        onDismiss = { showAccountPicker = false }
+                    )
+                }
             }
         }
     }
@@ -83,12 +94,91 @@ class LoginActivity : FragmentActivity() {
             })
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Biometric Login")
-            .setSubtitle("Log in using your biometric credential")
+            .setTitle("Verify your identity")
+            .setSubtitle("google.com needs to verify it's you")
             .setNegativeButtonText("Cancel")
             .build()
 
         biometricPrompt.authenticate(promptInfo)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AccountPickerSheet(onAccountSelected: () -> Unit, onDismiss: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        containerColor = Color.White
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_google), // Assuming you have a Google icon
+                contentDescription = null,
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Continue with account",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = DarkNavy
+            )
+            Text(
+                text = "example.com",
+                fontSize = 14.sp,
+                color = SubtitleGray
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Account Item
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { /* Selection logic if multiple */ },
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
+                color = Color.White
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFF0F2F5)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("E", fontWeight = FontWeight.Bold, color = Color.Gray)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("elisa.g.beckett@gmail.com", fontWeight = FontWeight.Medium, fontSize = 15.sp)
+                        Text("••••••••", color = SubtitleGray, fontSize = 12.sp)
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Button(
+                onClick = onAccountSelected,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A73E8))
+            ) {
+                Text("Continue", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }
 
@@ -274,7 +364,7 @@ fun SignInScreen(onSignInClick: () -> Unit = {}) {
                             }
                             Spacer(modifier = Modifier.width(14.dp))
                             Text(
-                                text = "Continue with Biometrics",
+                                text = "Continue with Google",
                                 color = Color.White,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
