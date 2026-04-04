@@ -119,14 +119,28 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
                             .background(Color(0xFFB6E3FA))
                             .clickable { onProfileClick() },
                         contentAlignment = Alignment.Center
-
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Profile",
-                            tint = DarkNavy,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        val profileImage = userProfile?.profileImage
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val resId = if (!profileImage.isNullOrEmpty()) {
+                            context.resources.getIdentifier(profileImage, "drawable", context.packageName)
+                        } else 0
+
+                        if (resId != 0) {
+                            Image(
+                                painter = painterResource(id = resId),
+                                contentDescription = "Profile",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Profile",
+                                tint = DarkNavy,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -135,8 +149,12 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
 
             // Greeting Section
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                val currentTime = System.currentTimeMillis()
+                val createdAt = userProfile?.createdAt ?: currentTime
+                val isNewUser = (currentTime - createdAt) < (24 * 60 * 60 * 1000L) // 24 hours
+                
                 Text(
-                    text = "WELCOME BACK",
+                    text = if (isNewUser) "WELCOME TO HANAPARAL" else "WELCOME BACK",
                     color = Color(0xFF4C705B),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
