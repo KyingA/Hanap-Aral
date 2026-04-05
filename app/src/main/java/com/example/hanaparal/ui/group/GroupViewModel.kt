@@ -1,23 +1,29 @@
 package com.example.hanaparal.ui.group
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.hanaparal.data.model.StudyGroup
+import com.example.hanaparal.data.repository.ChatMessage
 import com.example.hanaparal.data.repository.GroupRepository
+import com.example.hanaparal.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class GroupViewModel(private val repository: GroupRepository = GroupRepository) : ViewModel() {
-    private val _groups = MutableStateFlow<List<StudyGroup>>(emptyList())
-    val groups: StateFlow<List<StudyGroup>> = _groups.asStateFlow()
+class GroupViewModel : ViewModel() {
+    private val _studyGroups = MutableStateFlow<List<StudyGroup>>(emptyList())
+    val studyGroups: StateFlow<List<StudyGroup>> = _studyGroups.asStateFlow()
+
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    // Mock Current User ID
-    val currentUserId = "user1" 
+    val currentUserId: String
+        get() = UserRepository.getCurrentUserId()
 
     init {
         loadGroups()
@@ -25,42 +31,42 @@ class GroupViewModel(private val repository: GroupRepository = GroupRepository) 
 
     private fun loadGroups() {
         viewModelScope.launch {
-            repository.getGroups().collect {
-                _groups.value = it
+            GroupRepository.getGroups().collect { groups ->
+                _studyGroups.value = groups
             }
         }
     }
 
-    fun createGroup(name: String, subject: String, description: String, schedule: String, maxMembers: Int = 20) {
-        val newGroup = StudyGroup(
-            id = "", 
-            name = name,
-            subject = subject,
-            description = description,
-            adminId = currentUserId,
-            memberIds = listOf(currentUserId),
-            maxMembers = maxMembers,
-            schedule = schedule,
-            status = "ACTIVE"
-        )
+    fun loadMessages(groupId: String) {
         viewModelScope.launch {
-            repository.createGroup(newGroup)
+            GroupRepository.getMessages(groupId).collect { msgs ->
+                _messages.value = msgs
+            }
+        }
+    }
+
+    fun sendMessage(groupId: String, text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            GroupRepository.sendMessage(groupId, currentUserId, text)
         }
     }
 
     fun joinGroup(groupId: String) {
         viewModelScope.launch {
-            val result = repository.joinGroup(groupId, currentUserId)
+            val result = GroupRepository.joinGroup(groupId, currentUserId)
             if (result.isFailure) {
                 _errorMessage.value = result.exceptionOrNull()?.message
             }
         }
     }
 
-    fun leaveGroup(groupId: String) {
+    fun leaveGroup(groupId: String, onLeft: () -> Unit) {
         viewModelScope.launch {
-            val result = repository.leaveGroup(groupId, currentUserId)
-            if (result.isFailure) {
+            val result = GroupRepository.leaveGroup(groupId, currentUserId)
+            if (result.isSuccess) {
+                onLeft()
+            } else {
                 _errorMessage.value = result.exceptionOrNull()?.message
             }
         }
@@ -68,16 +74,7 @@ class GroupViewModel(private val repository: GroupRepository = GroupRepository) 
 
     fun deleteGroup(groupId: String) {
         viewModelScope.launch {
-            val result = repository.deleteGroup(groupId)
-            if (result.isFailure) {
-                _errorMessage.value = result.exceptionOrNull()?.message
-            }
-        }
-    }
-
-    fun updateGroup(updatedGroup: StudyGroup) {
-        viewModelScope.launch {
-            val result = repository.updateGroup(updatedGroup)
+            val result = GroupRepository.deleteGroup(groupId)
             if (result.isFailure) {
                 _errorMessage.value = result.exceptionOrNull()?.message
             }
@@ -86,5 +83,31 @@ class GroupViewModel(private val repository: GroupRepository = GroupRepository) 
 
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    fun getGroupById(groupId: String): StudyGroup? {
+        return _studyGroups.value.find { it.id == groupId }
+    }
+
+    fun createGroup(group: StudyGroup, onCreated: (String) -> Unit) {
+        viewModelScope.launch {
+            val result = GroupRepository.createGroup(group)
+            if (result.isSuccess) {
+                onCreated(result.getOrNull()?.id ?: "")
+            } else {
+                _errorMessage.value = result.exceptionOrNull()?.message
+            }
+        }
+    }
+
+    fun updateGroup(group: StudyGroup, onUpdated: () -> Unit) {
+        viewModelScope.launch {
+            val result = GroupRepository.updateGroup(group)
+            if (result.isSuccess) {
+                onUpdated()
+            } else {
+                _errorMessage.value = result.exceptionOrNull()?.message
+            }
+        }
     }
 }

@@ -9,9 +9,8 @@ lifecycleRuntimeKtx = "2.10.0"
 lifecycleViewModelCompose = "2.10.0"
 activityCompose = "1.13.0"
 kotlin = "2.1.0"
-composeBom = "2024.09.00"
-firebaseBom = "34.11.0"
-googleGmsGoogleServices = "4.4.2"
+composeBom = "2025.01.00"
+google-services = "4.4.1"
 
 [libraries]
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
@@ -31,16 +30,12 @@ androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
-firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
-firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
-firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
-firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
-firebase-config = { group = "com.google.firebase", name = "firebase-config" }
-firebase-inappmessaging = { group = "com.google.firebase", name = "firebase-inappmessaging-display" }
-firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
+androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-google-services = { id = "com.google.gms.google-services", version.ref = "googleGmsGoogleServices" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
