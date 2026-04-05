@@ -76,7 +76,8 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
     var selectedProgram by remember { mutableStateOf("") }
     var programExpanded by remember { mutableStateOf(false) }
     
-    val authEmail = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: ""
+    val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+    val authEmail = currentUser?.email ?: ""
     var email by remember { mutableStateOf(authEmail) }
     
     var emailError by remember { mutableStateOf(false) }
@@ -87,6 +88,7 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     val profileImages = listOf("doggy", "rizcat", "coolchik", "qthams", "bugssy", "dock")
+    var fullNameFieldError by remember { mutableStateOf<String?>(null) }
     var selectedImage by remember { mutableStateOf(profileImages[0]) }
 
     // Preferences state
@@ -103,6 +105,12 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
 
     LaunchedEffect(Unit) {
         viewModel.fetchUserProfile()
+    }
+
+    LaunchedEffect(authEmail) {
+        if (email.isBlank() && authEmail.isNotBlank()) {
+            email = authEmail
+        }
     }
 
     LaunchedEffect(userProfile) {
@@ -253,20 +261,45 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
 
         Spacer(modifier = Modifier.height(40.dp))
 
+        // Error message from VM
+        if (profileError != null) {
+            Surface(
+                color = Color(0xFFFEE2E2),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+            ) {
+                Text(
+                    text = profileError!!,
+                    color = Color(0xFFB91C1C),
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
+
         // Fields
         Text("Full Name", color = Color(0xFF374151), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = fullName,
-            onValueChange = { fullName = it },
+            onValueChange = { 
+                fullName = it 
+                fullNameFieldError = null
+            },
             placeholder = { Text("e.g. King Rivera", color = Color(0xFF9CA3AF), fontSize = 15.sp) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
+            isError = fullNameFieldError != null,
+            supportingText = {
+                fullNameFieldError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            },
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedContainerColor = Color(0xFFF3F4F6),
                 focusedContainerColor = Color(0xFFF3F4F6),
+                errorContainerColor = Color(0xFFFEE2E2),
                 unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = Color.Transparent
+                focusedBorderColor = Color.Transparent,
+                errorBorderColor = MaterialTheme.colorScheme.error
             ),
             textStyle = LocalTextStyle.current.copy(fontSize = 15.sp, color = Color(0xFF111827)),
             singleLine = true
@@ -321,16 +354,19 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
         OutlinedTextField(
             value = email,
             onValueChange = {},
-            enabled = false,
+            enabled = true,
             readOnly = true,
             supportingText = { Text("This email is linked to your account and cannot be edited.", color = Color(0xFF6B7280)) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                disabledContainerColor = Color(0xFFE5E7EB),
-                disabledBorderColor = Color.Transparent,
-                disabledTextColor = Color(0xFF6B7280),
-                disabledSupportingTextColor = Color(0xFF6B7280)
+                unfocusedContainerColor = Color(0xFFF3F4F6),
+                focusedContainerColor = Color(0xFFF3F4F6),
+                unfocusedBorderColor = Color.Transparent,
+                focusedBorderColor = Color.Transparent,
+                unfocusedTextColor = Color(0xFF111827),
+                focusedTextColor = Color(0xFF111827),
+                unfocusedSupportingTextColor = Color(0xFF6B7280)
             ),
             textStyle = LocalTextStyle.current.copy(fontSize = 15.sp),
             singleLine = true
@@ -479,6 +515,10 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
         Button(
             onClick = {
                 val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+                if (fullName.isBlank()) {
+                    fullNameFieldError = "Please enter your full name."
+                }
+                
                 if (!isEmailValid) {
                     emailError = true
                 }

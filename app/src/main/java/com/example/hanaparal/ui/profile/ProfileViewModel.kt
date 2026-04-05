@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.hanaparal.data.model.UserProfile
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +87,10 @@ class ProfileViewModel : ViewModel() {
             } catch (e: FirebaseAuthWeakPasswordException) {
                 Log.e("ProfileViewModel", "Weak password", e)
                 _profileError.value = "Password is too weak. Use at least 6 characters."
+                _saveStatus.value = false
+            } catch (e: FirebaseAuthUserCollisionException) {
+                Log.e("ProfileViewModel", "Account collision", e)
+                _profileError.value = "This email is already linked to another account."
                 _saveStatus.value = false
             } catch (e: Exception) {
                 Log.e("ProfileViewModel", "Error completing profile", e)
