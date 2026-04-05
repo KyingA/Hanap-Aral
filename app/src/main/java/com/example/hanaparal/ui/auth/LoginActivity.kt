@@ -9,7 +9,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.hanaparal.MainActivity
-import com.example.hanaparal.model.UserProfile
+import com.example.hanaparal.R
+import com.example.hanaparal.data.model.UserProfile
 import com.example.hanaparal.ui.profile.ProfileActivity
 import com.example.hanaparal.ui.screens.SignInScreen
 import com.example.hanaparal.ui.theme.HanapAralTheme
@@ -22,8 +23,14 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
+import com.example.hanaparal.utils.FcmNotificationBridge
 
 class LoginActivity : ComponentActivity() {
+
+    companion object {
+        /** Set from logout flow so we always show sign-in (and clear any stale session). */
+        const val EXTRA_AFTER_LOGOUT = "com.example.hanaparal.EXTRA_AFTER_LOGOUT"
+    }
 
     private lateinit var auth: FirebaseAuth
     private lateinit var googleSignInClient: GoogleSignInClient
@@ -47,7 +54,22 @@ class LoginActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        FcmNotificationBridge.consumeInitialMessageAndIntent(this, intent)
+
         auth = FirebaseAuth.getInstance()
+
+        if (intent.getBooleanExtra(EXTRA_AFTER_LOGOUT, false)) {
+            auth.signOut()
+            try {
+                val gsoClear = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken(getString(R.string.default_web_client_id))
+                    .requestEmail()
+                    .build()
+                GoogleSignIn.getClient(applicationContext, gsoClear).signOut()
+            } catch (e: Exception) {
+                Log.w("LoginActivity", "Google sign-out after logout", e)
+            }
+        }
 
         if (auth.currentUser != null) {
             navigateAfterAuth()
@@ -55,7 +77,7 @@ class LoginActivity : ComponentActivity() {
         }
 
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(com.example.hanaparal.R.string.default_web_client_id))
+            .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
             .build()
         googleSignInClient = GoogleSignIn.getClient(this, gso)

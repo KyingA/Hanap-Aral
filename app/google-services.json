@@ -14,7 +14,23 @@
       },
       "oauth_client": [
         {
-          "client_id": "151252341250-p6clurjkgnbptiungn06l583efgtqo62.apps.googleusercontent.com",
+          "client_id": "151252341250-hed5iq1768mhplb49v13rsdo5nqtq747.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.hanaparal",
+            "certificate_hash": "6f73a2b659cf85712e8591cfdbc752675b371be8"
+          }
+        },
+        {
+          "client_id": "151252341250-lvorl76a4kpm3j9o1jpdvniq8h70aavl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.hanaparal",
+            "certificate_hash": "53225c504540dc6ca0d7a2d768429416dc9789d1"
+          }
+        },
+        {
+          "client_id": "151252341250-auji2vtvv0m57hkg2oh7gi0vd197nk7r.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -27,7 +43,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "151252341250-p6clurjkgnbptiungn06l583efgtqo62.apps.googleusercontent.com",
+              "client_id": "151252341250-auji2vtvv0m57hkg2oh7gi0vd197nk7r.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

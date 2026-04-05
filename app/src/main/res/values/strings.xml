@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">HanapAral</string>
+    <!-- Must match Firebase / Google Sign-In web client ID (same as LoginActivity). -->
+    <string name="default_web_client_id" translatable="false">151252341250-p6clurjkgnbptiungn06l583efgtqo62.apps.googleusercontent.com</string>
 </resources>

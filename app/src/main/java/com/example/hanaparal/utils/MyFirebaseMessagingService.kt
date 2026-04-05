@@ -10,7 +10,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.hanaparal.MainActivity
 import com.example.hanaparal.R
-import com.example.hanaparal.data.NotificationRepository
+import com.example.hanaparal.data.repository.NotificationRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService

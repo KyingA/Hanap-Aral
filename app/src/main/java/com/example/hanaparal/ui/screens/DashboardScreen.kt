@@ -1,5 +1,7 @@
 package com.example.hanaparal.ui.screens
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -7,58 +9,92 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.materialIcon
 import androidx.compose.material3.*
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Badge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hanaparal.R
+import com.example.hanaparal.data.repository.NotificationRepository
+import com.example.hanaparal.data.model.StudyGroup
+import com.example.hanaparal.ui.group.CreateGroupActivity
+import com.example.hanaparal.ui.group.GroupDetailActivity
+import com.example.hanaparal.ui.group.GroupListActivity
+import com.example.hanaparal.ui.group.GroupViewModel
 import com.example.hanaparal.ui.theme.DarkNavy
+import com.example.hanaparal.ui.theme.DashboardScreenBg
 import com.example.hanaparal.ui.theme.HanapAralTheme
+import com.example.hanaparal.ui.theme.SubtitleGray
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.hanaparal.ui.auth.LoginActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.hanaparal.model.UserProfile
+import com.example.hanaparal.data.model.UserProfile
+import com.example.hanaparal.MainViewModel
+import com.example.hanaparal.ui.admin.SuperAdminActivity
 import com.example.hanaparal.ui.profile.ProfileViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(profileViewModel: ProfileViewModel = viewModel()) {
+fun DashboardScreen(
+    mainViewModel: MainViewModel = viewModel(),
+    profileViewModel: ProfileViewModel = viewModel(),
+    groupViewModel: GroupViewModel = viewModel()
+) {
     var selectedTab by remember { mutableStateOf(0) }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
+    val myGroups by groupViewModel.studyGroups.collectAsState()
     val userProfile by profileViewModel.userProfile.collectAsState()
+    val isGroupCreationEnabled by mainViewModel.isGroupCreationEnabled
+    val announcementHeader by mainViewModel.announcementHeader
+    val isSuperAdmin by mainViewModel.isSuperAdmin
 
     LaunchedEffect(Unit) {
         profileViewModel.fetchUserProfile()
     }
     
     Scaffold(
-        containerColor = Color(0xFFF8F9FA),
+        containerColor = DashboardScreenBg,
         bottomBar = { DashboardBottomNav(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
     ) { paddingValues ->
         when (selectedTab) {
-            0 -> DashboardContent(paddingValues, userProfile, onProfileClick = { selectedTab = 2 })
-            // 1 -> GroupsScreen(paddingValues)
-            2 -> ProfileScreen(
+            0 -> DashboardContent(
+                paddingValues = paddingValues,
+                userProfile = userProfile,
+                allGroups = myGroups,
+                groupViewModel = groupViewModel,
+                isGroupCreationEnabled = isGroupCreationEnabled,
+                announcementHeader = announcementHeader,
+                isSuperAdmin = isSuperAdmin,
+                onProfileClick = { selectedTab = 1 }
+            )
+            1 -> ProfileScreen(
                 paddingValues = paddingValues,
                 userProfile = userProfile,
                 onEditProfileClick = {
@@ -66,19 +102,42 @@ fun DashboardScreen(profileViewModel: ProfileViewModel = viewModel()) {
                     context.startActivity(intent)
                 },
                 onLogoutClick = {
-                    com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
-                    val intent = android.content.Intent(context, com.example.hanaparal.ui.auth.LoginActivity::class.java)
-                    intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    context.startActivity(intent)
+                    val activity = context as? ComponentActivity
+                    if (activity != null) {
+                        FirebaseAuth.getInstance().signOut()
+                        val intent = Intent(activity, LoginActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            putExtra(LoginActivity.EXTRA_AFTER_LOGOUT, true)
+                        }
+                        // Do not call finish(); CLEAR_TASK already tears down this activity.
+                        // Calling finish() here can crash on some devices during the transition.
+                        activity.startActivity(intent)
+                    }
                 }
             )
-            else -> DashboardContent(paddingValues, userProfile, onProfileClick = { selectedTab = 2 })
         }
     }
 }
 
 @Composable
-fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, onProfileClick: () -> Unit = {}) {
+fun DashboardContent(
+    paddingValues: PaddingValues,
+    userProfile: UserProfile?,
+    allGroups: List<StudyGroup>,
+    groupViewModel: GroupViewModel,
+    isGroupCreationEnabled: Boolean = true,
+    announcementHeader: String = "",
+    isSuperAdmin: Boolean = false,
+    onProfileClick: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val notifications by NotificationRepository.notifications.collectAsStateWithLifecycle(
+        initialValue = emptyList()
+    )
+    var showNotificationsDialog by remember { mutableStateOf(false) }
+    val currentUserId = groupViewModel.currentUserId
+    val myGroups = allGroups.filter { it.memberIds.contains(currentUserId) }
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -109,12 +168,49 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = "Notifications",
-                        tint = Color(0xFF6B7280),
-                        modifier = Modifier.size(24.dp)
-                    )
+                    if (isSuperAdmin) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Superuser controls",
+                            tint = DarkNavy,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable {
+                                    context.startActivity(Intent(context, SuperAdminActivity::class.java))
+                                }
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clickable { showNotificationsDialog = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                if (notifications.isNotEmpty()) {
+                                    val unread = notifications.count { !it.isRead }
+                                    Badge(
+                                        containerColor = if (unread > 0) Color(0xFFDC2626) else Color(0xFF6B7280)
+                                    ) {
+                                        Text(
+                                            text = if (notifications.size > 99) "99+" else notifications.size.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = "Notifications",
+                                tint = if (notifications.any { !it.isRead }) DarkNavy else Color(0xFF6B7280),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.width(16.dp))
                     Box(
                         modifier = Modifier
@@ -125,9 +221,9 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
                         contentAlignment = Alignment.Center
                     ) {
                         val profileImage = userProfile?.profileImage
-                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val profileContext = LocalContext.current
                         val resId = if (!profileImage.isNullOrEmpty()) {
-                            context.resources.getIdentifier(profileImage, "drawable", context.packageName)
+                            profileContext.resources.getIdentifier(profileImage, "drawable", profileContext.packageName)
                         } else 0
 
                         if (resId != 0) {
@@ -172,18 +268,42 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
                     fontSize = 32.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
+                val showRemoteAnnouncement = announcementHeader.isNotBlank() &&
+                    !announcementHeader.trim().equals("Welcome to Hanap-Aral!", ignoreCase = true)
+                if (showRemoteAnnouncement) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFEEF2FF),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = announcementHeader,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            color = DarkNavy,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = buildAnnotatedString {
-                        append("You have ")
-                        withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = DarkNavy)) {
-                            append("3 study sessions")
+                    text = if (myGroups.isEmpty()) {
+                        buildAnnotatedString {
+                            append("Join or create a ")
+                            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = DarkNavy)) {
+                                append("study group")
+                            }
+                            append(" to get started!")
                         }
-                        append(" scheduled for this ")
-                        withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = DarkNavy)) {
-                            append("week")
+                    } else {
+                        buildAnnotatedString {
+                            append("You're in ")
+                            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = DarkNavy)) {
+                                append("${myGroups.size} study group${if (myGroups.size != 1) "s" else ""}")
+                            }
+                            append(". Keep up the momentum!")
                         }
-                        append(". Keep up the momentum!")
                     },
                     fontSize = 14.sp,
                     color = Color(0xFF6B7280),
@@ -195,7 +315,7 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
                 // Action Buttons
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Button(
-                        onClick = { },
+                        onClick = { context.startActivity(Intent(context, GroupListActivity::class.java)) },
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
@@ -204,25 +324,45 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
                         ) {
                             Icon(imageVector = Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Find Group", fontSize = 15.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Left)
+                            Text("Find Group", fontSize = 15.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Left)
                         }
                     Spacer(modifier = Modifier.width(12.dp))
                     Surface(
-                        onClick = { },
+                        onClick = {
+                            if (isGroupCreationEnabled) {
+                                context.startActivity(Intent(context, CreateGroupActivity::class.java))
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Group creation is temporarily disabled.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
                         shape = RoundedCornerShape(24.dp),
-                        color = Color.White,
-                        shadowElevation = 2.dp
+                        color = if (isGroupCreationEnabled) Color.White else Color(0xFFF3F4F6),
+                        shadowElevation = if (isGroupCreationEnabled) 2.dp else 0.dp
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(imageVector = Icons.Default.AddCircle, contentDescription = null, tint = DarkNavy, modifier = Modifier.size(20.dp))
+                            Icon(
+                                imageVector = Icons.Default.AddCircle,
+                                contentDescription = null,
+                                tint = if (isGroupCreationEnabled) DarkNavy else Color(0xFF9CA3AF),
+                                modifier = Modifier.size(20.dp)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Create", color = DarkNavy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Create",
+                                color = if (isGroupCreationEnabled) DarkNavy else Color(0xFF9CA3AF),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
@@ -248,67 +388,82 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
                             modifier = Modifier.size(20.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text("4", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4B5563))
+                                Text("${myGroups.size}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4B5563))
                             }
                         }
                     }
-                    Text("View All", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
+                    if (myGroups.isNotEmpty()) {
+                        Text(
+                            "View All",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DarkNavy,
+                            modifier = Modifier.clickable { context.startActivity(Intent(context, GroupListActivity::class.java)) }
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Row(
-                    modifier = Modifier
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp)
-                ) {
-                    GroupCard(
-                        iconString = "{ }",
-                        iconBg = Color(0xFFCDEAC3),
-                        status = "ACTIVE",
-                        statusBg = Color(0xFFFFEDD5),
-                        statusColor = Color(0xFFC2410C),
-                        title = "Data Structures 101",
-                        members = "12",
-                        time = "Wed, 4PM",
-                        progress = 0.7f
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    GroupCard(
-                        iconString = "C",
-                        iconBg = Color(0xFFBFDBFE),
-                        status = "NEW",
-                        statusBg = Color(0xFFE0E7FF),
-                        statusColor = Color(0xFF4338CA),
-                        title = "C++ Study Circle",
-                        members = "8",
-                        time = "Fri, 2PM",
-                        progress = 0.3f
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    GroupCard(
-                        iconString = "PY",
-                        iconBg = Color(0xFFFFEBEE),
-                        status = "CLOSED",
-                        statusBg = Color(0xFFFFCDD2),
-                        statusColor = Color(0xFFB71C1C),
-                        title = "Python Programming",
-                        members = "4",
-                        time = "Sat, 10AM",
-                        progress = 0.9f
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    GroupCard(
-                        iconString = "DSA",
-                        iconBg = Color(0xFFE8F5E9),
-                        status = "CLOSED",
-                        statusBg = Color(0xFFC8E6C9),
-                        statusColor = Color(0xFF2E7D32),
-                        title = "Data Structures 101",
-                        members = "12",
-                        time = "Wed, 4PM",
-                        progress = 0.7f
-                    )
+                if (myGroups.isEmpty()) {
+                    // Empty state for no groups
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Groups,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = Color(0xFFD1D5DB)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("No groups yet", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = DarkNavy)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Find or create a study group to get started!", fontSize = 13.sp, color = Color(0xFF6B7280), textAlign = TextAlign.Center)
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp)
+                            .height(IntrinsicSize.Min)
+                    ) {
+                        val groupColors = listOf(
+                            Color(0xFFCDEAC3), Color(0xFFBFDBFE), Color(0xFFFFEBEE),
+                            Color(0xFFE8F5E9), Color(0xFFFFF3E0), Color(0xFFE1BEE7)
+                        )
+                        myGroups.forEachIndexed { index, group ->
+                            GroupCard(
+                                iconString = group.name.take(2).uppercase(),
+                                iconBg = groupColors[index % groupColors.size],
+                                status = group.status,
+                                statusBg = if (group.status == "ACTIVE") Color(0xFFFFEDD5) else Color(0xFFE5E7EB),
+                                statusColor = if (group.status == "ACTIVE") Color(0xFFC2410C) else Color(0xFF4B5563),
+                                title = group.name,
+                                members = "${group.memberIds.size}",
+                                time = group.formattedSchedule,
+                                progress = group.memberIds.size.toFloat() / group.maxMembers.toFloat(),
+                                onClick = {
+                                    val intent = Intent(context, GroupDetailActivity::class.java)
+                                    intent.putExtra("GROUP_ID", group.id)
+                                    context.startActivity(intent)
+                                }
+                            )
+                            if (index < myGroups.lastIndex) {
+                                Spacer(modifier = Modifier.width(16.dp))
+                            }
+                        }
+                    }
                 }
             }
 
@@ -319,27 +474,61 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
                 Text("Upcoming Sessions", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    shadowElevation = 0.dp
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        SessionRow("24", "OCT", "Algorithm Review", "4:30 PM • Library Room 4", Icons.Default.KeyboardArrowRight)
-                        HorizontalDivider(color = Color(0xFFF3F4F6), modifier = Modifier.padding(vertical = 12.dp))
-                        SessionRow("26", "OCT", "Calculus Mock Exam", "10:00 AM • Zoom", Icons.Default.Videocam)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFF8F9FA),
-                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
-                                .clickable { }
+                if (myGroups.isEmpty()) {
+                    // Empty state for no sessions
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("View Calendar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = DarkNavy)
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = Color(0xFFD1D5DB)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("No upcoming sessions", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = DarkNavy)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Sessions will appear here when you join a group.", fontSize = 13.sp, color = Color(0xFF6B7280), textAlign = TextAlign.Center)
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        shadowElevation = 0.dp
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            myGroups.take(3).forEachIndexed { index, group ->
+                                SessionRow(
+                                    day = group.scheduleDays.firstOrNull()?.take(3) ?: "--",
+                                    month = group.subject.take(3).uppercase(),
+                                    title = group.name,
+                                    subtitle = "${group.timeStart} • ${group.scheduleDays.joinToString(", ")}",
+                                    trailingIcon = Icons.Default.ChevronRight
+                                )
+                                if (index < minOf(2, myGroups.lastIndex)) {
+                                    HorizontalDivider(color = Color(0xFFF3F4F6), modifier = Modifier.padding(vertical = 12.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = DashboardScreenBg,
+                                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .clickable { context.startActivity(Intent(context, GroupListActivity::class.java)) }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("View All Groups", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = DarkNavy)
+                                }
                             }
                         }
                     }
@@ -348,56 +537,110 @@ fun DashboardContent(paddingValues: PaddingValues, userProfile: UserProfile?, on
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Suggested for You
+            // Suggested for You - Dynamic
+            val suggestedGroups = allGroups.filter { !it.memberIds.contains(currentUserId) }
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 Text("Suggested for You", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
                 Text(
-                    "Based on your Program in Computer Science",
+                    if (userProfile?.program?.isNotBlank() == true)
+                        "Based on your Program in ${userProfile.program}"
+                    else
+                        "Groups you might be interested in",
                     fontSize = 13.sp,
                     color = Color(0xFF6B7280),
                     modifier = Modifier.padding(top = 2.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                SuggestedCard(
-                    bgGradientTop = Color(0xFF469B82),
-                    bgGradientBottom = Color(0xFF327A65),
-                    tagText = "CS CORE",
-                    title = "Algorithms Mastery",
-                    desc = "Weekly deep dives into Big O notation and sorting optimizations. Perfect for juniors.",
-                    logoContent = {
-                        Icon(
-                            imageVector = Icons.Default.Create, // Placeholder for poly icon
-                            contentDescription = null,
-                            modifier = Modifier.size(60.dp),
-                            tint = Color.White
-                        )
+                if (suggestedGroups.isEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Explore,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = Color(0xFFD1D5DB)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("No suggestions right now", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = DarkNavy)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Check back later for new groups!", fontSize = 13.sp, color = Color(0xFF6B7280), textAlign = TextAlign.Center)
+                        }
                     }
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-
-                SuggestedCard(
-                    bgGradientTop = Color(0xFF1F4045),
-                    bgGradientBottom = Color(0xFF0F262A),
-                    tagText = "ADVANCED",
-                    tagColor = Color(0xFFFFEDD5),
-                    tagTextColor = Color(0xFFC2410C),
-                    title = "SQL & Database Systems",
-                    desc = "Hands-on practice with relational schema design and complex queries.",
-                    logoContent = {
-                        Icon(
-                            imageVector = Icons.Default.Storage,
-                            contentDescription = null,
-                            modifier = Modifier.size(60.dp),
-                            tint = Color(0xFF86D9E9)
+                } else {
+                    val gradientColors = listOf(
+                        Pair(Color(0xFF469B82), Color(0xFF327A65)),
+                        Pair(Color(0xFF1F4045), Color(0xFF0F262A)),
+                        Pair(Color(0xFF5B4A9E), Color(0xFF3D2E7C)),
+                        Pair(Color(0xFF2D5F8A), Color(0xFF1A3D5C))
+                    )
+                    suggestedGroups.forEachIndexed { index, group ->
+                        val colors = gradientColors[index % gradientColors.size]
+                        DynamicSuggestedCard(
+                            group = group,
+                            bgGradientTop = colors.first,
+                            bgGradientBottom = colors.second,
+                            onJoinClick = { groupViewModel.joinGroup(group.id) },
+                            onCardClick = {
+                                val intent = Intent(context, GroupDetailActivity::class.java)
+                                intent.putExtra("GROUP_ID", group.id)
+                                context.startActivity(intent)
+                            }
                         )
+                        if (index < suggestedGroups.lastIndex) {
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
                     }
-                )
+                }
             }
             Spacer(modifier = Modifier.height(32.dp))
         }
+
+        if (showNotificationsDialog) {
+            AlertDialog(
+                onDismissRequest = { showNotificationsDialog = false },
+                title = { Text("Notifications") },
+                text = {
+                    if (notifications.isEmpty()) {
+                        Text(
+                            "No messages yet. Send a test from Firebase Console → Messaging (Cloud Messaging). " +
+                                "On Android 13+, allow notifications when the app asks.",
+                            fontSize = 14.sp
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())
+                        ) {
+                            notifications.forEach { n ->
+                                Text(n.title, fontWeight = FontWeight.Bold)
+                                Text(n.body, fontSize = 13.sp, color = Color(0xFF6B7280))
+                                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            NotificationRepository.markAllAsRead()
+                            showNotificationsDialog = false
+                        }
+                    ) { Text("Mark all read") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showNotificationsDialog = false }) { Text("Close") }
+                }
+            )
+        }
     }
+}
 
 @Composable
 fun GroupCard(
@@ -409,12 +652,13 @@ fun GroupCard(
     title: String,
     members: String,
     time: String,
-    progress: Float
+    progress: Float,
+    onClick: () -> Unit = {}
 ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        modifier = Modifier.width(260.dp).clickable { },
+        modifier = Modifier.width(260.dp).fillMaxHeight().clickable { onClick() },
         shadowElevation = 3.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -481,21 +725,23 @@ fun SessionRow(day: String, month: String, title: String, subtitle: String, trai
 }
 
 @Composable
-fun SuggestedCard(
+fun DynamicSuggestedCard(
+    group: StudyGroup,
     bgGradientTop: Color,
-    bgGradientBottom: Color, // Simplified to single color for background if brush not used
-    tagText: String,
-    tagColor: Color = Color(0xFFCDEAC3),
-    tagTextColor: Color = Color(0xFF4C705B),
-    title: String,
-    desc: String,
-    logoContent: @Composable () -> Unit
+    bgGradientBottom: Color,
+    onJoinClick: () -> Unit,
+    onCardClick: () -> Unit
 ) {
+    val memberAvatars = listOf(
+        R.drawable.bugssy, R.drawable.coolchik, R.drawable.dock,
+        R.drawable.doggy, R.drawable.qthams, R.drawable.rizcat
+    )
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         shadowElevation = 5.dp,
-        modifier = Modifier.fillMaxWidth().clickable { }
+        modifier = Modifier.fillMaxWidth().clickable { onCardClick() }
     ) {
         Column {
             Box(
@@ -505,28 +751,41 @@ fun SuggestedCard(
                     .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(bgGradientTop, bgGradientBottom))),
                 contentAlignment = Alignment.Center
             ) {
-                logoContent()
+                Text(
+                    text = group.name.take(2).uppercase(),
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White.copy(alpha = 0.3f)
+                )
+                Text(
+                    text = group.subject,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             }
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(color = tagColor, shape = RoundedCornerShape(12.dp)) {
+                    Surface(color = Color(0xFFCDEAC3), shape = RoundedCornerShape(12.dp)) {
                         Text(
-                            text = tagText,
+                            text = group.subject.uppercase().take(8),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = tagTextColor,
+                            color = Color(0xFF4C705B),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color(0xFF4B5563))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Trusted", fontSize = 11.sp, color = Color(0xFF4B5563))
+                    Text(
+                        "${group.memberIds.size}/${group.maxMembers} members",
+                        fontSize = 11.sp,
+                        color = Color(0xFF4B5563)
+                    )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(desc, fontSize = 13.sp, color = Color(0xFF6B7280), lineHeight = 18.sp)
+                Text(group.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(group.description.ifEmpty { group.formattedSchedule }, fontSize = 13.sp, color = Color(0xFF6B7280), lineHeight = 18.sp, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 
@@ -535,29 +794,65 @@ fun SuggestedCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Small Avatar Stack Placeholder
+                    // Member avatar stack using drawable images
                     Row {
-                        Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(Color(0xFFEADBCE)).border(2.dp, Color.White, CircleShape))
-                        Box(modifier = Modifier.size(28.dp).offset(x = (-8).dp).clip(CircleShape).background(Color(0xFF4B5563)).border(2.dp, Color.White, CircleShape))
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFFE5E7EB),
-                            modifier = Modifier.size(28.dp).offset(x = (-16).dp).border(2.dp, Color.White, CircleShape)
-                        ) { Box(contentAlignment = Alignment.Center) { Text("+16", fontSize = 10.sp, fontWeight = FontWeight.Bold) } }
+                        group.memberIds.take(3).forEachIndexed { i, _ ->
+                            val avatarRes = memberAvatars[i % memberAvatars.size]
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .offset(x = (i * -8).dp)
+                                    .clip(CircleShape)
+                                    .border(2.dp, Color.White, CircleShape)
+                            ) {
+                                Image(
+                                    painter = painterResource(id = avatarRes),
+                                    contentDescription = "Member",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                        if (group.memberIds.size > 3) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFFE5E7EB),
+                                modifier = Modifier.size(28.dp).offset(x = (3 * -8).dp).border(2.dp, Color.White, CircleShape)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("+${group.memberIds.size - 3}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                     }
                     
-                    Surface(
-                        color = Color(0xFFDBEAFE),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.clickable { }
-                    ) {
-                        Text(
-                            "Join Group",
-                            color = Color(0xFF1E3A8A),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
+                    if (group.memberIds.size < group.maxMembers) {
+                        Surface(
+                            color = Color(0xFFDBEAFE),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.clickable { onJoinClick() }
+                        ) {
+                            Text(
+                                "Join Group",
+                                color = Color(0xFF1E3A8A),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    } else {
+                        Surface(
+                            color = Color(0xFFF3F4F6),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text(
+                                "Full",
+                                color = Color(0xFF9CA3AF),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -586,16 +881,10 @@ fun DashboardBottomNav(selectedTab: Int, onTabSelected: (Int) -> Unit) {
                 onClick = { onTabSelected(0) }
             )
             NavItem(
-                icon = Icons.Default.Person,
-                label = "GROUPS",
-                isSelected = selectedTab == 1,
-                onClick = { onTabSelected(1) }
-            )
-            NavItem(
                 icon = Icons.Default.AccountCircle,
                 label = "PROFILE",
-                isSelected = selectedTab == 2,
-                onClick = { onTabSelected(2) }
+                isSelected = selectedTab == 1,
+                onClick = { onTabSelected(1) }
             )
         }
     }

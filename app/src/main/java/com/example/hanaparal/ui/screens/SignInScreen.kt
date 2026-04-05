@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -16,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hanaparal.R
 import com.example.hanaparal.ui.theme.DarkNavy
+import com.example.hanaparal.ui.theme.DashboardScreenBg
+import com.example.hanaparal.ui.theme.SubtitleGray
 
 @Composable
 fun SignInScreen(
@@ -29,6 +32,11 @@ fun SignInScreen(
     // but the design emphasizes Google Login.
 
     var showEmailDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val bookLogoRes = remember(context) {
+        val id = context.resources.getIdentifier("book", "drawable", context.packageName)
+        if (id != 0) id else R.drawable.ic_book
+    }
 
     if (showEmailDialog) {
         EmailLoginDialog(
@@ -40,7 +48,7 @@ fun SignInScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White) // Changed to white to hide the book's background
+            .background(DashboardScreenBg)
     ) {
         // Upper background section
         Column(
@@ -50,7 +58,7 @@ fun SignInScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
-                painter = painterResource(id = R.drawable.book), // assuming book.png exists and matches the mockup
+                painter = painterResource(id = bookLogoRes),
                 contentDescription = "Book Logo",
                 modifier = Modifier
                     .size(200.dp)
@@ -69,7 +77,7 @@ fun SignInScreen(
 
             Text(
                 text = "Your Study Companion",
-                color = Color(0xFF6E7B86),
+                color = SubtitleGray,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 letterSpacing = 1.5.sp
@@ -80,8 +88,8 @@ fun SignInScreen(
         Surface(
             modifier = Modifier.align(Alignment.BottomCenter),
             shape = RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp),
-            color = Color(0xFFEEEEEE), // A little dark to emphasize the white top section
-            shadowElevation = 16.dp
+            color = Color.White,
+            shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier
@@ -102,7 +110,7 @@ fun SignInScreen(
 
                 Text(
                     text = "Join curated study groups designed\nfor focused academic excellence.",
-                    color = Color(0xFF000000),
+                    color = SubtitleGray,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,
                     lineHeight = 22.sp
@@ -160,12 +168,12 @@ fun SignInScreen(
                 if (canUseEmailPasswordLogin) {
                     Spacer(modifier = Modifier.height(12.dp))
                     TextButton(onClick = { showEmailDialog = true }) {
-                        Text("Sign in with Email instead", color = Color.Black, fontSize = 14.sp)
+                        Text("Sign in with Email instead", color = DarkNavy, fontSize = 14.sp)
                     }
                 } else {
                     Spacer(modifier = Modifier.height(12.dp))
                     TextButton(onClick = { showRestrictedAlert = true }) {
-                        Text("Sign in with Email instead", color = Color.Black, fontSize = 14.sp)
+                        Text("Sign in with Email instead", color = DarkNavy, fontSize = 14.sp)
                     }
                 }
 

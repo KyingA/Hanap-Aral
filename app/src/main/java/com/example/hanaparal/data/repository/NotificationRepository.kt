@@ -1,4 +1,4 @@
-package com.example.hanaparal.data
+package com.example.hanaparal.data.repository
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +20,13 @@ object NotificationRepository {
     val hasUnread = _notifications.map { list -> list.any { !it.isRead } }
 
     fun addNotification(title: String, body: String) {
-        val newItem = NotificationItem(title = title, body = body)
+        val now = System.currentTimeMillis()
+        val isDup = _notifications.value.any { existing ->
+            existing.title == title && existing.body == body &&
+                kotlin.math.abs(now - existing.timestamp) < 15_000L
+        }
+        if (isDup) return
+        val newItem = NotificationItem(title = title, body = body, timestamp = now)
         _notifications.value = listOf(newItem) + _notifications.value
     }
 

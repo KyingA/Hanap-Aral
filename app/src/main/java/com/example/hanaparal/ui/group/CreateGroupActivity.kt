@@ -23,8 +23,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hanaparal.data.model.StudyGroup
-import com.example.hanaparal.ui.theme.BackgroundLight
+import com.example.hanaparal.data.config.RemoteConfigManager
 import com.example.hanaparal.ui.theme.DarkNavy
+import com.example.hanaparal.ui.theme.DashboardScreenBg
 import com.example.hanaparal.ui.theme.HanapAralTheme
 import java.text.SimpleDateFormat
 import java.util.*
@@ -57,14 +58,32 @@ fun CreateGroupScreen(
     var name by remember { mutableStateOf(groupToEdit?.name ?: "") }
     var subject by remember { mutableStateOf(groupToEdit?.subject ?: "") }
     var description by remember { mutableStateOf(groupToEdit?.description ?: "") }
-    var maxMembers by remember { mutableStateOf(groupToEdit?.maxMembers?.toString() ?: "20") }
-    
+    var maxMembers by remember { mutableStateOf("") }
+
+    LaunchedEffect(editGroupId, groups) {
+        val toEdit = editGroupId?.let { id -> groups.find { it.id == id } }
+        when {
+            toEdit != null -> maxMembers = toEdit.maxMembers.toString()
+            editGroupId != null -> Unit
+            else -> {
+                val rc = RemoteConfigManager()
+                maxMembers = rc.getMaxGroupMembers().toString()
+                rc.fetchAndActivate {
+                    maxMembers = rc.getMaxGroupMembers().toString()
+                }
+            }
+        }
+    }
+
     val daysOfWeek = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     var selectedDays by remember { mutableStateOf(groupToEdit?.scheduleDays?.toSet() ?: emptySet()) }
     var timeStart by remember { mutableStateOf(groupToEdit?.timeStart ?: "9:00 AM") }
     var timeEnd by remember { mutableStateOf(groupToEdit?.timeEnd ?: "10:00 AM") }
 
     val context = LocalContext.current
+    val resolvedMaxMembers = maxMembers.toIntOrNull()
+        ?: groupToEdit?.maxMembers
+        ?: RemoteConfigManager().getMaxGroupMembers().toInt().coerceIn(2, 500)
 
     fun showTimePicker(onTimeSelected: (String) -> Unit) {
         val calendar = Calendar.getInstance()
@@ -81,11 +100,11 @@ fun CreateGroupScreen(
     }
 
     Scaffold(
-        containerColor = BackgroundLight,
+        containerColor = DashboardScreenBg,
         topBar = {
             TopAppBar(
                 title = { Text(if (editGroupId == null) "Create Study Group" else "Edit Group", fontWeight = FontWeight.Bold, color = DarkNavy) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundLight),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = DashboardScreenBg),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DarkNavy)
@@ -110,8 +129,8 @@ fun CreateGroupScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = DarkNavy,
                     unfocusedTextColor = DarkNavy,
-                    focusedBorderColor = Color(0xFF8B5CF6),
-                    focusedLabelColor = Color(0xFF8B5CF6),
+                    focusedBorderColor = DarkNavy,
+                    focusedLabelColor = DarkNavy,
                     unfocusedContainerColor = Color.White,
                     focusedContainerColor = Color.White
                 )
@@ -124,8 +143,8 @@ fun CreateGroupScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = DarkNavy,
                     unfocusedTextColor = DarkNavy,
-                    focusedBorderColor = Color(0xFF8B5CF6),
-                    focusedLabelColor = Color(0xFF8B5CF6),
+                    focusedBorderColor = DarkNavy,
+                    focusedLabelColor = DarkNavy,
                     unfocusedContainerColor = Color.White,
                     focusedContainerColor = Color.White
                 )
@@ -139,8 +158,8 @@ fun CreateGroupScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = DarkNavy,
                     unfocusedTextColor = DarkNavy,
-                    focusedBorderColor = Color(0xFF8B5CF6),
-                    focusedLabelColor = Color(0xFF8B5CF6),
+                    focusedBorderColor = DarkNavy,
+                    focusedLabelColor = DarkNavy,
                     unfocusedContainerColor = Color.White,
                     focusedContainerColor = Color.White
                 )
@@ -163,7 +182,7 @@ fun CreateGroupScreen(
                         },
                         label = { Text(day.take(1)) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF8B5CF6),
+                            selectedContainerColor = DarkNavy,
                             selectedLabelColor = Color.White
                         )
                     )
@@ -216,8 +235,8 @@ fun CreateGroupScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = DarkNavy,
                     unfocusedTextColor = DarkNavy,
-                    focusedBorderColor = Color(0xFF8B5CF6),
-                    focusedLabelColor = Color(0xFF8B5CF6),
+                    focusedBorderColor = DarkNavy,
+                    focusedLabelColor = DarkNavy,
                     unfocusedContainerColor = Color.White,
                     focusedContainerColor = Color.White
                 )
@@ -236,7 +255,7 @@ fun CreateGroupScreen(
                                 description = description,
                                 adminId = viewModel.currentUserId,
                                 memberIds = listOf(viewModel.currentUserId),
-                                maxMembers = maxMembers.toIntOrNull() ?: 20,
+                                maxMembers = resolvedMaxMembers,
                                 scheduleDays = selectedDays.toList(),
                                 timeStart = timeStart,
                                 timeEnd = timeEnd
@@ -252,14 +271,14 @@ fun CreateGroupScreen(
                                 scheduleDays = selectedDays.toList(),
                                 timeStart = timeStart,
                                 timeEnd = timeEnd,
-                                maxMembers = maxMembers.toIntOrNull() ?: 20
+                                maxMembers = resolvedMaxMembers
                             )) { onBack() }
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = name.isNotBlank() && subject.isNotBlank() && selectedDays.isNotEmpty(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
+                colors = ButtonDefaults.buttonColors(containerColor = DarkNavy),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(if (editGroupId == null) "Create Group" else "Save Changes", fontWeight = FontWeight.Bold)

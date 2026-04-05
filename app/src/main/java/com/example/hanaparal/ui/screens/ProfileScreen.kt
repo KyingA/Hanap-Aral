@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,25 +24,36 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.hanaparal.model.UserProfile
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.hanaparal.data.model.StudyGroup
+import com.example.hanaparal.data.model.UserProfile
+import com.example.hanaparal.ui.group.GroupViewModel
 import com.example.hanaparal.ui.theme.DarkNavy
+import com.example.hanaparal.ui.theme.DashboardScreenBg
 
 @Composable
 fun ProfileScreen(
     paddingValues: PaddingValues,
     userProfile: UserProfile?,
     onEditProfileClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    groupViewModel: GroupViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val allGroups by groupViewModel.studyGroups.collectAsState()
+    val myGroups = allGroups.filter { it.memberIds.contains(groupViewModel.currentUserId) }
+    
+    // Find the next upcoming session from user's groups
+    val nextSession = myGroups.firstOrNull { it.scheduleDays.isNotEmpty() && it.timeStart.isNotEmpty() }
     
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(paddingValues)
-            .background(Color(0xFFFAFBFC)) // very light background
+            .background(DashboardScreenBg)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
     ) {
@@ -63,7 +77,7 @@ fun ProfileScreen(
                 modifier = Modifier
                     .size(100.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE5E7EB)),
+                    .background(Color(0xFFB6E3FA)),
                 contentAlignment = Alignment.Center
             ) {
                 val profileImage = userProfile?.profileImage
@@ -82,7 +96,7 @@ fun ProfileScreen(
                     Icon(
                         imageVector = Icons.Default.Person,
                         contentDescription = "Profile",
-                        tint = Color.Gray,
+                        tint = DarkNavy,
                         modifier = Modifier.size(60.dp)
                     )
                 }
@@ -119,19 +133,22 @@ fun ProfileScreen(
         
         // Stat Cards Row
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Groups Card
+            // Groups Card - Dynamic
             Surface(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 border = BorderStroke(1.dp, Color(0xFFF3F4F6)),
                 shadowElevation = 2.dp
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(16.dp).fillMaxHeight(),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
@@ -146,37 +163,68 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Groups", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7280))
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("4", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = DarkNavy)
+                    Box(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("${myGroups.size}", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = DarkNavy)
+                    }
                 }
             }
             
-            // Study Hrs Card
+            // Class Reminder Card - Dynamic
             Surface(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 border = BorderStroke(1.dp, Color(0xFFF3F4F6)),
                 shadowElevation = 2.dp
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(16.dp).fillMaxHeight()
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = CircleShape,
-                            color = Color(0xFFE3F2FD),
+                            color = Color(0xFFFFF3E0),
                             modifier = Modifier.size(32.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF1565C0))
+                                Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFFE65100))
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Study Hrs", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7280))
+                        Text("Next Class", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7280))
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("12.5", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = DarkNavy)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (nextSession != null) {
+                        Text(
+                            nextSession.name,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DarkNavy,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            "${nextSession.timeStart}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFE65100)
+                        )
+                        Text(
+                            nextSession.scheduleDays.joinToString(", "),
+                            fontSize = 11.sp,
+                            color = Color(0xFF6B7280),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else {
+                        Text("None", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFD1D5DB))
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("No classes yet", fontSize = 11.sp, color = Color(0xFF9CA3AF))
+                    }
                 }
             }
         }

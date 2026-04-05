@@ -43,10 +43,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.lifecycleScope
 import com.example.hanaparal.MainActivity
 import com.example.hanaparal.R
-import com.example.hanaparal.model.UserProfile
+import com.example.hanaparal.data.model.UserProfile
 import com.example.hanaparal.ui.theme.*
 import com.example.hanaparal.utils.LoginPreferences
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -60,18 +59,9 @@ class ProfileActivity : ComponentActivity() {
         setContent {
             HanapAralTheme(darkTheme = false) {
                 CreateProfileScreen(
-                    onComplete = { name, program ->
-                        lifecycleScope.launch {
-                            val user = User(
-                                userId = UserRepository.getCurrentUserId(),
-                                name = name,
-                                course = program,
-                                email = "" // Update this if you have the email from login
-                            )
-                            UserRepository.saveProfile(user)
-                            startActivity(Intent(this@ProfileActivity, MainActivity::class.java))
-                            finish()
-                        }
+                    onComplete = {
+                        startActivity(Intent(this@ProfileActivity, MainActivity::class.java))
+                        finish()
                     }
                 )
             }
@@ -367,7 +357,7 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
             placeholder = { Text("At least 6 characters", color = Color(0xFF9CA3AF), fontSize = 15.sp) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
@@ -406,7 +396,7 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
             placeholder = { Text("Repeat password", color = Color(0xFF9CA3AF), fontSize = 15.sp) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            visualTransformation = if (confirmPasswordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
                     Icon(
@@ -611,4 +601,3 @@ fun PreferenceChip(
         )
     }
 }
-

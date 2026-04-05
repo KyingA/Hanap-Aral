@@ -9,6 +9,9 @@ val SecondaryLight = Color(0xFF64748B)
 val TertiaryLight = Color(0xFF0F172A)
 
 val BackgroundLight = Color(0xFFF8FAFC)
+
+/** Page background — matches [com.example.hanaparal.ui.screens.DashboardScreen] scaffold. */
+val DashboardScreenBg = Color(0xFFF8F9FA)
 val SurfaceLight = Color(0xFFFFFFFF)
 val ErrorLight = Color(0xFFBA1A1A)
 

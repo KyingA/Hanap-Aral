@@ -25,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hanaparal.data.model.StudyGroup
-import com.example.hanaparal.ui.theme.BackgroundLight
 import com.example.hanaparal.ui.theme.DarkNavy
+import com.example.hanaparal.ui.theme.DashboardScreenBg
 import com.example.hanaparal.ui.theme.HanapAralTheme
 import com.example.hanaparal.ui.theme.SubtitleGray
 
@@ -68,11 +68,11 @@ fun GroupListScreen(
     }
 
     Scaffold(
-        containerColor = BackgroundLight,
+        containerColor = DashboardScreenBg,
         topBar = {
             TopAppBar(
                 title = { Text("Available Groups", fontWeight = FontWeight.Bold, color = DarkNavy) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundLight),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = DashboardScreenBg),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DarkNavy)
@@ -83,7 +83,7 @@ fun GroupListScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onCreateGroupClick,
-                containerColor = Color(0xFF8B5CF6),
+                containerColor = DarkNavy,
                 contentColor = Color.White,
                 shape = RoundedCornerShape(16.dp)
             ) {
@@ -111,7 +111,7 @@ fun GroupListScreen(
                     unfocusedContainerColor = Color.White,
                     focusedContainerColor = Color.White,
                     unfocusedBorderColor = Color.Black.copy(alpha = 0.05f),
-                    focusedBorderColor = Color(0xFF8B5CF6)
+                    focusedBorderColor = DarkNavy
                 )
             )
 
@@ -159,13 +159,13 @@ fun GroupListItem(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(Color(0xFF8B5CF6).copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                    .background(DarkNavy.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = group.name.take(1).uppercase(),
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF8B5CF6),
+                    color = DarkNavy,
                     fontSize = 20.sp
                 )
             }
@@ -182,7 +182,7 @@ fun GroupListItem(
                 Text(
                     text = group.subject,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF8B5CF6),
+                    color = DarkNavy,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))

@@ -1,7 +1,10 @@
 package com.example.hanaparal.data.repository
 
+import android.util.Log
+import com.example.hanaparal.data.model.GroupAnnouncement
 import com.example.hanaparal.data.model.StudyGroup
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -20,13 +23,26 @@ data class ChatMessage(
 )
 
 object GroupRepository {
+    private const val TAG = "GroupRepository"
+
     private val firestore = FirebaseFirestore.getInstance()
     private val groupsCollection = firestore.collection("groups")
+
+    /**
+     * Snapshot listeners must not use [kotlinx.coroutines.channels.SendChannel.close] with an error:
+     * after sign-out, rules return PERMISSION_DENIED and that would crash collectors (e.g. in
+     * [com.example.hanaparal.ui.group.GroupViewModel]). Emit an empty list instead.
+     */
+    private fun logSnapshotError(where: String, error: Throwable) {
+        val code = (error as? FirebaseFirestoreException)?.code?.name
+        Log.w(TAG, "Firestore listener $where failed${if (code != null) " ($code)" else ""}", error)
+    }
 
     fun getGroups(): Flow<List<StudyGroup>> = callbackFlow {
         val subscription = groupsCollection.addSnapshotListener { snapshot, error ->
             if (error != null) {
-                close(error)
+                logSnapshotError("groups", error)
+                trySend(emptyList())
                 return@addSnapshotListener
             }
             if (snapshot != null) {
@@ -37,12 +53,58 @@ object GroupRepository {
         awaitClose { subscription.remove() }
     }
 
+    fun getAnnouncements(groupId: String): Flow<List<GroupAnnouncement>> = callbackFlow {
+        val subscription = groupsCollection.document(groupId).collection("announcements")
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    logSnapshotError("announcements/$groupId", error)
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val list = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(GroupAnnouncement::class.java)?.copy(
+                            id = doc.id,
+                            groupId = groupId
+                        )
+                    }
+                    trySend(list)
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    suspend fun postAnnouncement(
+        groupId: String,
+        title: String,
+        body: String,
+        createdBy: String
+    ): Result<Unit> {
+        return try {
+            val ref = groupsCollection.document(groupId).collection("announcements").document()
+            val item = GroupAnnouncement(
+                id = ref.id,
+                groupId = groupId,
+                title = title.trim(),
+                body = body.trim(),
+                createdAt = System.currentTimeMillis(),
+                createdBy = createdBy
+            )
+            ref.set(item).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun getMessages(groupId: String): Flow<List<ChatMessage>> = callbackFlow {
         val subscription = groupsCollection.document(groupId).collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    logSnapshotError("messages/$groupId", error)
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
