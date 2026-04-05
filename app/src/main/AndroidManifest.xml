@@ -46,6 +46,18 @@
             android:theme="@style/Theme.HanapAral" />
 
         <activity
+            android:name=".ui.group.GroupDetailActivity"
+            android:exported="false"
+            android:label="Group Details"
+            android:theme="@style/Theme.HanapAral" />
+
+        <activity
+            android:name=".ui.group.GroupListActivity"
+            android:exported="false"
+            android:label="Find Groups"
+            android:theme="@style/Theme.HanapAral" />
+
+        <activity
             android:name=".ui.admin.SuperAdminActivity"
             android:exported="false"
             android:label="Superuser Controls"

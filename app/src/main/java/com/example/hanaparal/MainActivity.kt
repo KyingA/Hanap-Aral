@@ -2,6 +2,7 @@ package com.example.hanaparal
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -47,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.hanaparal.data.NotificationRepository
 import com.example.hanaparal.data.model.StudyGroup
 import com.example.hanaparal.ui.admin.SuperAdminActivity
 import com.example.hanaparal.ui.group.CreateGroupActivity
@@ -55,12 +57,37 @@ import com.example.hanaparal.ui.group.GroupListActivity
 import com.example.hanaparal.ui.group.GroupViewModel
 import com.example.hanaparal.ui.profile.ProfileActivity
 import com.example.hanaparal.ui.theme.*
-import java.util.Calendar
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val token = task.result
+                Log.d("FCM_TOKEN", token ?: "")
+                
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
+                if (userId != null && token != null) {
+                    FirebaseFirestore.getInstance()
+                        .collection("users")
+                        .document(userId)
+                        .update("fcmToken", token)
+                        .addOnFailureListener { e ->
+                            Log.w("FCM", "Error updating token in Firestore", e)
+                        }
+                }
+            } else {
+                Log.w("FCM", "Fetching token failed", task.exception)
+            }
+        }
+
         setContent {
             HanapAralTheme(dynamicColor = false) {
                 DashboardScreen(
@@ -99,12 +126,15 @@ fun DashboardScreen(
 ) {
     val groups by viewModel.groups.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
-    val announcementHeader by mainViewModel.announcementHeader
     val context = LocalContext.current
     
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
-    var showAnnouncements by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
+
+    // Notification State
+    val notifications by NotificationRepository.notifications.collectAsState()
+    val hasUnread by NotificationRepository.hasUnread.collectAsState(initial = false)
     
     val myGroups = groups.filter { it.memberIds.contains(viewModel.currentUserId) }
     
@@ -129,17 +159,19 @@ fun DashboardScreen(
         }
     }
 
-    if (showAnnouncements) {
-        AnnouncementDialog(
-            headerText = announcementHeader,
-            onDismiss = { showAnnouncements = false }
+    if (showNotifications) {
+        ModernNotificationDialog(
+            notifications = notifications,
+            onDismiss = { showNotifications = false },
+            onMarkAllRead = { NotificationRepository.markAllAsRead() },
+            onMarkItemRead = { id -> NotificationRepository.markAsRead(id) }
         )
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DashboardBg)
+            .background(if (hasUnread) Color(0xFF0A0A14) else DashboardBg) // Darker background if unread
     ) {
         BackgroundOrbs()
 
@@ -153,8 +185,13 @@ fun DashboardScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ── Header Section (With Profile Pic) ──
-            HeaderSection(greeting, onProfileClick, onAdminClick)
+            HeaderSection(
+                greeting = greeting, 
+                onProfileClick = onProfileClick, 
+                onAdminClick = onAdminClick,
+                hasUnread = hasUnread,
+                onNotificationsClick = { showNotifications = true }
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
             
@@ -180,7 +217,6 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // ── My Group Focus ──
             if (myGroups.isNotEmpty()) {
                 SectionHeader(title = "My Group", actionText = "See all", onActionClick = onFindGroupClick)
                 Spacer(modifier = Modifier.height(16.dp))
@@ -201,26 +237,23 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
             
-            // ── Upcoming Sessions ──
             SectionHeader(title = "Upcoming Sessions")
             Spacer(modifier = Modifier.height(16.dp))
             UpcomingSessionsRow(myGroups, onGroupClick)
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // ── Action Grid ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 ActionCard(title = "New Group", icon = Icons.Default.Add, color = Color(0xFF6366F1), onClick = onCreateClick, modifier = Modifier.weight(1f))
                 ActionCard(title = "Explore", icon = Icons.Default.Search, color = Color(0xFFEC4899), onClick = onFindGroupClick, modifier = Modifier.weight(1f))
-                ActionCard(title = "Alerts", icon = Icons.Default.Campaign, color = Color(0xFFF59E0B), onClick = { showAnnouncements = true }, modifier = Modifier.weight(1f))
+                ActionCard(title = "Alerts", icon = Icons.Default.Campaign, color = Color(0xFFF59E0B), onClick = { showNotifications = true }, modifier = Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(36.dp))
 
-            // ── Recommended Section ──
             SectionHeader(title = "Discover Communities")
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -253,14 +286,19 @@ fun DashboardScreen(
 }
 
 @Composable
-fun HeaderSection(greeting: String, onProfileClick: () -> Unit, onAdminClick: () -> Unit) {
+fun HeaderSection(
+    greeting: String, 
+    onProfileClick: () -> Unit, 
+    onAdminClick: () -> Unit,
+    hasUnread: Boolean,
+    onNotificationsClick: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Profile Image Placeholder
             Surface(
                 modifier = Modifier.size(48.dp).clickable { onProfileClick() },
                 shape = CircleShape,
@@ -286,7 +324,7 @@ fun HeaderSection(greeting: String, onProfileClick: () -> Unit, onAdminClick: ()
                     Surface(
                         color = Color(0xFFF59E0B).copy(alpha = 0.15f), 
                         shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.clickable { onAdminClick() } // Entry to Admin for demo
+                        modifier = Modifier.clickable { onAdminClick() }
                     ) {
                         Text(text = "🔥 5", color = Color(0xFFF59E0B), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                     }
@@ -297,10 +335,198 @@ fun HeaderSection(greeting: String, onProfileClick: () -> Unit, onAdminClick: ()
             }
         }
         
-        Row {
-            IconButton(onClick = { /* Notifications */ }) {
+        Box {
+            IconButton(onClick = onNotificationsClick) {
                 Icon(imageVector = Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.White)
             }
+            if (hasUnread) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(Color.Red, CircleShape)
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-8).dp, y = 8.dp)
+                        .border(1.5.dp, DashboardBg, CircleShape)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernNotificationDialog(
+    notifications: List<com.example.hanaparal.data.NotificationItem>,
+    onDismiss: () -> Unit,
+    onMarkAllRead: () -> Unit,
+    onMarkItemRead: (String) -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight()
+                .padding(vertical = 32.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp,
+            shadowElevation = 12.dp
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Notifications",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    IconButton(
+                        onClick = onDismiss,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+                // Content
+                if (notifications.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(48.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(64.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Outlined.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "All caught up!",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "You don't have any notifications.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 450.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        notifications.forEach { item ->
+                            ModernNotificationItem(item, onMarkRead = { onMarkItemRead(item.id) })
+                        }
+                    }
+                }
+
+                // Footer
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onMarkAllRead() }
+                        .padding(top = 8.dp),
+                    color = Color.Transparent
+                ) {
+                    Text(
+                        text = "Mark all as read",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(24.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernNotificationItem(
+    item: com.example.hanaparal.data.NotificationItem,
+    onMarkRead: () -> Unit
+) {
+    val timeAgo = remember(item.timestamp) {
+        val diff = System.currentTimeMillis() - item.timestamp
+        when {
+            diff < 60000 -> "Just now"
+            diff < 3600000 -> "${diff / 60000}m ago"
+            diff < 86400000 -> "${diff / 3600000}h ago"
+            else -> SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(item.timestamp))
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (item.isRead) Color.Transparent else MaterialTheme.colorScheme.primary.copy(alpha = 0.03f))
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        // Checkbox to mark as read
+        Checkbox(
+            checked = item.isRead,
+            onCheckedChange = { if (it) onMarkRead() },
+            colors = CheckboxDefaults.colors(
+                checkedColor = MaterialTheme.colorScheme.primary,
+                uncheckedColor = MaterialTheme.colorScheme.outline
+            ),
+            modifier = Modifier.size(24.dp).padding(top = 4.dp)
+        )
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (item.isRead) FontWeight.Medium else FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = item.body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = timeAgo,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        
+        IconButton(onClick = { /* Item options */ }, modifier = Modifier.size(24.dp)) {
+            Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -445,7 +671,6 @@ fun MyGroupHighlightCard(title: String, subject: String, schedule: String, membe
         shadowElevation = 8.dp
     ) {
         Box {
-            // Background Pattern
             Icon(
                 imageVector = Icons.Default.Groups,
                 contentDescription = null,
@@ -758,14 +983,12 @@ fun NavItem(icon: ImageVector, label: String, isSelected: Boolean) {
 @Composable
 fun BackgroundOrbs() {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Top Left Orb
         Box(
             modifier = Modifier
                 .offset(x = (-50).dp, y = (-50).dp)
                 .size(250.dp)
                 .background(Brush.radialGradient(listOf(Color(0xFF6366F1).copy(alpha = 0.15f), Color.Transparent)))
         )
-        // Bottom Right Orb
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -773,66 +996,5 @@ fun BackgroundOrbs() {
                 .size(300.dp)
                 .background(Brush.radialGradient(listOf(Color(0xFFEC4899).copy(alpha = 0.1f), Color.Transparent)))
         )
-    }
-}
-
-@Composable
-fun AnnouncementDialog(headerText: String, onDismiss: () -> Unit) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .wrapContentHeight(),
-            shape = RoundedCornerShape(28.dp),
-            color = SurfaceDark,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Surface(
-                    modifier = Modifier.size(64.dp),
-                    shape = CircleShape,
-                    color = Color(0xFFF59E0B).copy(alpha = 0.15f)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Campaign, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(32.dp))
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(20.dp))
-                
-                Text(
-                    text = "Announcements",
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                Text(
-                    text = headerText,
-                    color = TextGray,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text("Got it!", modifier = Modifier.padding(vertical = 8.dp))
-                }
-            }
-        }
     }
 }
