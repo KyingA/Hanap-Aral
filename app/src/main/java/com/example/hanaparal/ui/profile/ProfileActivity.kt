@@ -75,7 +75,10 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
     var fullName by remember { mutableStateOf("") }
     var selectedProgram by remember { mutableStateOf("") }
     var programExpanded by remember { mutableStateOf(false) }
-    var email by remember { mutableStateOf("") }
+    
+    val authEmail = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: ""
+    var email by remember { mutableStateOf(authEmail) }
+    
     var emailError by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -83,7 +86,7 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
     var confirmPasswordFieldError by remember { mutableStateOf<String?>(null) }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
-    val profileImages = listOf("beldog", "dopcat", "gencat", "hams", "hartmonks", "monks")
+    val profileImages = listOf("doggy", "rizcat", "coolchik", "qthams", "bugssy", "dock")
     var selectedImage by remember { mutableStateOf(profileImages[0]) }
 
     // Preferences state
@@ -313,19 +316,61 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text("Institutional Email", color = Color(0xFF374151), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text("Linked Account Email", color = Color(0xFF374151), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = email,
-            onValueChange = { 
-                email = it 
-                emailError = false
-            },
-            placeholder = { Text("king@university.edu", color = Color(0xFF9CA3AF), fontSize = 15.sp) },
-            isError = emailError,
-            supportingText = { if (emailError) Text("Please enter a valid email address.", color = MaterialTheme.colorScheme.error) },
+            onValueChange = {},
+            enabled = false,
+            readOnly = true,
+            supportingText = { Text("This email is linked to your account and cannot be edited.", color = Color(0xFF6B7280)) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledContainerColor = Color(0xFFE5E7EB),
+                disabledBorderColor = Color.Transparent,
+                disabledTextColor = Color(0xFF6B7280),
+                disabledSupportingTextColor = Color(0xFF6B7280)
+            ),
+            textStyle = LocalTextStyle.current.copy(fontSize = 15.sp),
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = if (needsPasswordLink) "Create a password so you can sign in with email next time." else "Update your password (leave blank to keep current password).",
+            color = Color(0xFF6B7280),
+            fontSize = 13.sp,
+            lineHeight = 18.sp
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Password", color = Color(0xFF374151), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = password,
+            onValueChange = {
+                password = it
+                passwordFieldError = null
+                confirmPasswordFieldError = null
+                viewModel.clearProfileError()
+            },
+            placeholder = { Text("At least 6 characters", color = Color(0xFF9CA3AF), fontSize = 15.sp) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                        tint = Color(0xFF6B7280)
+                    )
+                }
+            },
+            isError = passwordFieldError != null,
+            supportingText = {
+                passwordFieldError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            },
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedContainerColor = Color(0xFFF3F4F6),
                 focusedContainerColor = Color(0xFFF3F4F6),
@@ -337,94 +382,45 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
             textStyle = LocalTextStyle.current.copy(fontSize = 15.sp, color = Color(0xFF111827)),
             singleLine = true
         )
-
-        if (needsPasswordLink) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Create a password so you can sign in with email next time (uses your Google account email).",
-                color = Color(0xFF6B7280),
-                fontSize = 13.sp,
-                lineHeight = 18.sp
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Password", color = Color(0xFF374151), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = {
-                    password = it
-                    passwordFieldError = null
-                    confirmPasswordFieldError = null
-                    viewModel.clearProfileError()
-                },
-                placeholder = { Text("At least 6 characters", color = Color(0xFF9CA3AF), fontSize = 15.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                            tint = Color(0xFF6B7280)
-                        )
-                    }
-                },
-                isError = passwordFieldError != null,
-                supportingText = {
-                    passwordFieldError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = Color(0xFFF3F4F6),
-                    focusedContainerColor = Color(0xFFF3F4F6),
-                    errorContainerColor = Color(0xFFFEE2E2),
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedBorderColor = Color.Transparent,
-                    errorBorderColor = MaterialTheme.colorScheme.error
-                ),
-                textStyle = LocalTextStyle.current.copy(fontSize = 15.sp, color = Color(0xFF111827)),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Confirm password", color = Color(0xFF374151), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = {
-                    confirmPassword = it
-                    passwordFieldError = null
-                    confirmPasswordFieldError = null
-                    viewModel.clearProfileError()
-                },
-                placeholder = { Text("Repeat password", color = Color(0xFF9CA3AF), fontSize = 15.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                        Icon(
-                            imageVector = if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password",
-                            tint = Color(0xFF6B7280)
-                        )
-                    }
-                },
-                isError = confirmPasswordFieldError != null,
-                supportingText = {
-                    confirmPasswordFieldError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = Color(0xFFF3F4F6),
-                    focusedContainerColor = Color(0xFFF3F4F6),
-                    errorContainerColor = Color(0xFFFEE2E2),
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedBorderColor = Color.Transparent,
-                    errorBorderColor = MaterialTheme.colorScheme.error
-                ),
-                textStyle = LocalTextStyle.current.copy(fontSize = 15.sp, color = Color(0xFF111827)),
-                singleLine = true
-            )
-        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Confirm password", color = Color(0xFF374151), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = confirmPassword,
+            onValueChange = {
+                confirmPassword = it
+                passwordFieldError = null
+                confirmPasswordFieldError = null
+                viewModel.clearProfileError()
+            },
+            placeholder = { Text("Repeat password", color = Color(0xFF9CA3AF), fontSize = 15.sp) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            visualTransformation = if (confirmPasswordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                    Icon(
+                        imageVector = if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password",
+                        tint = Color(0xFF6B7280)
+                    )
+                }
+            },
+            isError = confirmPasswordFieldError != null,
+            supportingText = {
+                confirmPasswordFieldError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedContainerColor = Color(0xFFF3F4F6),
+                focusedContainerColor = Color(0xFFF3F4F6),
+                errorContainerColor = Color(0xFFFEE2E2),
+                unfocusedBorderColor = Color.Transparent,
+                focusedBorderColor = Color.Transparent,
+                errorBorderColor = MaterialTheme.colorScheme.error
+            ),
+            textStyle = LocalTextStyle.current.copy(fontSize = 15.sp, color = Color(0xFF111827)),
+            singleLine = true
+        )
 
         Spacer(modifier = Modifier.height(40.dp))
 
@@ -499,9 +495,12 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
                     profileImage = selectedImage
                 )
 
-                if (viewModel.hasEmailPasswordProvider()) {
-                    viewModel.saveUserProfile(profile)
-                } else {
+                if (needsPasswordLink && password.isBlank()) {
+                    passwordFieldError = "Password is required to link your account."
+                    return@Button
+                }
+
+                if (password.isNotBlank() || confirmPassword.isNotBlank()) {
                     when {
                         password.length < 6 -> {
                             passwordFieldError = "Password must be at least 6 characters."
@@ -518,6 +517,8 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}, viewModel: ProfileViewModel
                             viewModel.completeProfileWithPassword(profile, password)
                         }
                     }
+                } else {
+                    viewModel.saveUserProfile(profile)
                 }
             },
             enabled = !isLoading,

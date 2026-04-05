@@ -70,6 +70,13 @@ class ProfileViewModel : ViewModel() {
                     }
                     val credential = EmailAuthProvider.getCredential(email, password)
                     user.linkWithCredential(credential).await()
+                } else if (password.isNotBlank()) {
+                    if (password.length < 6) {
+                        _profileError.value = "Password must be at least 6 characters."
+                        _saveStatus.value = false
+                        return@launch
+                    }
+                    user.updatePassword(password).await()
                 }
                 val createdAt = _userProfile.value?.createdAt?.takeIf { it > 0 } ?: System.currentTimeMillis()
                 val profileWithUid = profileData.copy(uid = uid, createdAt = createdAt)

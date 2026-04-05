@@ -61,6 +61,10 @@ fun DashboardScreen(profileViewModel: ProfileViewModel = viewModel()) {
             2 -> ProfileScreen(
                 paddingValues = paddingValues,
                 userProfile = userProfile,
+                onEditProfileClick = {
+                    val intent = android.content.Intent(context, com.example.hanaparal.ui.profile.ProfileActivity::class.java)
+                    context.startActivity(intent)
+                },
                 onLogoutClick = {
                     com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
                     val intent = android.content.Intent(context, com.example.hanaparal.ui.auth.LoginActivity::class.java)
