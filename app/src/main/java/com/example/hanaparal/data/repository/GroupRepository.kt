@@ -1,105 +1,130 @@
 package com.example.hanaparal.data.repository
 
 import com.example.hanaparal.data.model.StudyGroup
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
 
-/**
- * Singleton repository to maintain state across different Activities.
- */
+data class ChatMessage(
+    val id: String = "",
+    val groupId: String = "",
+    val senderId: String = "",
+    val text: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 object GroupRepository {
-    private val _mockGroups = MutableStateFlow(listOf(
-        StudyGroup(
-            id = "1",
-            name = "Data Structures 101",
-            description = "Mastering trees, graphs, and algorithms.",
-            subject = "CS Core",
-            adminId = "user1",
-            memberIds = listOf("user1", "user2", "user3"),
-            maxMembers = 5,
-            schedule = "Mon, Wed 4:00 PM",
-            status = "ACTIVE"
-        ),
-        StudyGroup(
-            id = "2",
-            name = "C++ Study Circle",
-            description = "Learning advanced C++ features and STL.",
-            subject = "Programming",
-            adminId = "user2",
-            memberIds = listOf("user2", "user4", "user5"),
-            maxMembers = 15,
-            schedule = "Fri 2:00 PM",
-            status = "ACTIVE"
+    private val firestore = FirebaseFirestore.getInstance()
+    private val groupsCollection = firestore.collection("groups")
+
+    fun getGroups(): Flow<List<StudyGroup>> = callbackFlow {
+        val subscription = groupsCollection.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            if (snapshot != null) {
+                val groups = snapshot.toObjects(StudyGroup::class.java)
+                trySend(groups)
+            }
+        }
+        awaitClose { subscription.remove() }
+    }
+
+    fun getMessages(groupId: String): Flow<List<ChatMessage>> = callbackFlow {
+        val subscription = groupsCollection.document(groupId).collection("messages")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val messages = snapshot.toObjects(ChatMessage::class.java)
+                    trySend(messages)
+                }
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    suspend fun sendMessage(groupId: String, senderId: String, text: String) {
+        val docRef = groupsCollection.document(groupId).collection("messages").document()
+        val newMessage = ChatMessage(
+            id = docRef.id,
+            groupId = groupId,
+            senderId = senderId,
+            text = text
         )
-    ))
+        docRef.set(newMessage).await()
+    }
 
-    fun getGroups(): Flow<List<StudyGroup>> = _mockGroups.asStateFlow()
-
-    suspend fun createGroup(group: StudyGroup): Result<String> {
-        val currentList = _mockGroups.value.toMutableList()
-        val id = (currentList.size + 1).toString()
-        val newGroup = group.copy(id = id)
-        currentList.add(newGroup)
-        _mockGroups.value = currentList
-        return Result.success(id)
+    suspend fun createGroup(group: StudyGroup): Result<StudyGroup> {
+        return try {
+            val docRef = groupsCollection.document()
+            val newGroup = group.copy(id = docRef.id)
+            docRef.set(newGroup).await()
+            Result.success(newGroup)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun joinGroup(groupId: String, userId: String): Result<Unit> {
-        val currentList = _mockGroups.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == groupId }
-        if (index == -1) return Result.failure(Exception("Group not found"))
-        
-        val group = currentList[index]
-        
-        // Member Limit Enforcement
-        if (group.memberIds.size >= group.maxMembers) {
-            return Result.failure(Exception("This group is already full (${group.maxMembers}/${group.maxMembers})"))
+        return try {
+            val docRef = groupsCollection.document(groupId)
+            val snapshot = docRef.get().await()
+            val group = snapshot.toObject(StudyGroup::class.java) ?: throw Exception("Group not found")
+            
+            if (!group.memberIds.contains(userId)) {
+                docRef.update("memberIds", group.memberIds + userId).await()
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-        
-        if (group.memberIds.contains(userId)) {
-            return Result.failure(Exception("You are already a member"))
-        }
-
-        currentList[index] = group.copy(memberIds = group.memberIds + userId)
-        _mockGroups.value = currentList
-        return Result.success(Unit)
     }
 
     suspend fun leaveGroup(groupId: String, userId: String): Result<Unit> {
-        val currentList = _mockGroups.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == groupId }
-        if (index == -1) return Result.failure(Exception("Group not found"))
-
-        val group = currentList[index]
-        val updatedMembers = group.memberIds.filter { it != userId }
-        
-        if (updatedMembers.isEmpty()) {
-            currentList.removeAt(index)
-        } else {
-            var newAdminId = group.adminId
-            if (group.adminId == userId) newAdminId = updatedMembers.first()
-            currentList[index] = group.copy(memberIds = updatedMembers, adminId = newAdminId)
+        return try {
+            val docRef = groupsCollection.document(groupId)
+            val snapshot = docRef.get().await()
+            val group = snapshot.toObject(StudyGroup::class.java) ?: throw Exception("Group not found")
+            
+            val updatedMembers = group.memberIds.filter { it != userId }
+            if (updatedMembers.isEmpty()) {
+                docRef.delete().await()
+            } else {
+                var newAdminId = group.adminId
+                if (group.adminId == userId) newAdminId = updatedMembers.first()
+                docRef.update("memberIds", updatedMembers, "adminId", newAdminId).await()
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-
-        _mockGroups.value = currentList
-        return Result.success(Unit)
     }
 
     suspend fun deleteGroup(groupId: String): Result<Unit> {
-        val currentList = _mockGroups.value.toMutableList()
-        val removed = currentList.removeIf { it.id == groupId }
-        if (!removed) return Result.failure(Exception("Group not found"))
-        _mockGroups.value = currentList
-        return Result.success(Unit)
+        return try {
+            groupsCollection.document(groupId).delete().await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun updateGroup(updatedGroup: StudyGroup): Result<Unit> {
-        val currentList = _mockGroups.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == updatedGroup.id }
-        if (index == -1) return Result.failure(Exception("Group not found"))
-        currentList[index] = updatedGroup
-        _mockGroups.value = currentList
-        return Result.success(Unit)
+        return try {
+            groupsCollection.document(updatedGroup.id).set(updatedGroup).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

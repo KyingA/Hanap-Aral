@@ -29,19 +29,32 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.lifecycleScope
 import com.example.hanaparal.MainActivity
+import com.example.hanaparal.data.model.User
+import com.example.hanaparal.data.repository.UserRepository
 import com.example.hanaparal.ui.theme.*
+import kotlinx.coroutines.launch
 
 class ProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            HanapAralTheme(dynamicColor = false) {
+            HanapAralTheme(darkTheme = false) {
                 CreateProfileScreen(
-                    onComplete = {
-                        startActivity(Intent(this, MainActivity::class.java))
-                        finish()
+                    onComplete = { name, program ->
+                        lifecycleScope.launch {
+                            val user = User(
+                                userId = UserRepository.getCurrentUserId(),
+                                name = name,
+                                course = program,
+                                email = "" // Update this if you have the email from login
+                            )
+                            UserRepository.saveProfile(user)
+                            startActivity(Intent(this@ProfileActivity, MainActivity::class.java))
+                            finish()
+                        }
                     }
                 )
             }
@@ -51,7 +64,7 @@ class ProfileActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateProfileScreen(onComplete: () -> Unit = {}) {
+fun CreateProfileScreen(onComplete: (String, String) -> Unit = { _, _ -> }) {
     var fullName by remember { mutableStateOf("") }
     var selectedProgram by remember { mutableStateOf("") }
     var programExpanded by remember { mutableStateOf(false) }
@@ -163,6 +176,8 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = DarkNavy,
+                    unfocusedTextColor = DarkNavy,
                     unfocusedBorderColor = Color(0xFFE0E4EA),
                     focusedBorderColor = MediumNavy,
                     unfocusedContainerColor = Color.White,
@@ -192,6 +207,8 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}) {
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = DarkNavy,
+                        unfocusedTextColor = DarkNavy,
                         unfocusedBorderColor = Color(0xFFE0E4EA),
                         focusedBorderColor = MediumNavy,
                         unfocusedContainerColor = Color.White,
@@ -220,10 +237,11 @@ fun CreateProfileScreen(onComplete: () -> Unit = {}) {
 
             // ── Complete Profile Button ──
             Button(
-                onClick = onComplete,
+                onClick = { onComplete(fullName, selectedProgram) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
+                enabled = fullName.isNotBlank() && selectedProgram.isNotBlank(),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = DarkNavy),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp, pressedElevation = 2.dp)

@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hanaparal.data.model.StudyGroup
+import com.example.hanaparal.ui.theme.BackgroundLight
 import com.example.hanaparal.ui.theme.DarkNavy
 import com.example.hanaparal.ui.theme.HanapAralTheme
 import com.example.hanaparal.ui.theme.SubtitleGray
@@ -57,7 +59,7 @@ fun GroupListScreen(
     onGroupClick: (String) -> Unit,
     onCreateGroupClick: () -> Unit
 ) {
-    val groups by viewModel.groups.collectAsState()
+    val groups by viewModel.studyGroups.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     
     val filteredGroups = groups.filter { 
@@ -66,12 +68,14 @@ fun GroupListScreen(
     }
 
     Scaffold(
+        containerColor = BackgroundLight,
         topBar = {
             TopAppBar(
-                title = { Text("Available Groups", fontWeight = FontWeight.Bold) },
+                title = { Text("Available Groups", fontWeight = FontWeight.Bold, color = DarkNavy) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundLight),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DarkNavy)
                     }
                 }
             )
@@ -79,8 +83,9 @@ fun GroupListScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onCreateGroupClick,
-                containerColor = DarkNavy,
-                contentColor = Color.White
+                containerColor = Color(0xFF8B5CF6),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Create Group")
             }
@@ -90,9 +95,7 @@ fun GroupListScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(Color(0xFFF5F7FA))
         ) {
-            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -100,11 +103,15 @@ fun GroupListScreen(
                     .fillMaxWidth()
                     .padding(16.dp),
                 placeholder = { Text("Search groups...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = SubtitleGray) },
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = DarkNavy,
+                    unfocusedTextColor = DarkNavy,
                     unfocusedContainerColor = Color.White,
-                    focusedContainerColor = Color.White
+                    focusedContainerColor = Color.White,
+                    unfocusedBorderColor = Color.Black.copy(alpha = 0.05f),
+                    focusedBorderColor = Color(0xFF8B5CF6)
                 )
             )
 
@@ -113,18 +120,25 @@ fun GroupListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(filteredGroups) { group ->
-                    GroupListItem(
-                        group = group,
-                        onClick = { onGroupClick(group.id) }
-                    )
+                if (filteredGroups.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No groups found", color = SubtitleGray)
+                        }
+                    }
+                } else {
+                    items(filteredGroups) { group ->
+                        GroupListItem(
+                            group = group,
+                            onClick = { onGroupClick(group.id) }
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupListItem(
     group: StudyGroup,
@@ -135,7 +149,8 @@ fun GroupListItem(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        shadowElevation = 2.dp
+        shadowElevation = 1.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f))
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -144,13 +159,13 @@ fun GroupListItem(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(Color(0xFFE8F0FF), RoundedCornerShape(12.dp)),
+                    .background(Color(0xFF8B5CF6).copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = group.name.take(1).uppercase(),
                     fontWeight = FontWeight.Bold,
-                    color = DarkNavy,
+                    color = Color(0xFF8B5CF6),
                     fontSize = 20.sp
                 )
             }
@@ -167,7 +182,7 @@ fun GroupListItem(
                 Text(
                     text = group.subject,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF2D8B4E),
+                    color = Color(0xFF8B5CF6),
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -188,9 +203,9 @@ fun GroupListItem(
             }
             
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack, // Will flip later or use Chevron
+                imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp).padding(start = 8.dp),
+                modifier = Modifier.size(20.dp),
                 tint = SubtitleGray
             )
         }
