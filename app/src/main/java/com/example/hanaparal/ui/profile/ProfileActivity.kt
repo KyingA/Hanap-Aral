@@ -43,6 +43,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.lifecycleScope
 import com.example.hanaparal.MainActivity
 import com.example.hanaparal.R
 import com.example.hanaparal.model.UserProfile
@@ -57,11 +58,20 @@ class ProfileActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            HanapAralTheme(dynamicColor = false) {
+            HanapAralTheme(darkTheme = false) {
                 CreateProfileScreen(
-                    onComplete = {
-                        startActivity(Intent(this, MainActivity::class.java))
-                        finish()
+                    onComplete = { name, program ->
+                        lifecycleScope.launch {
+                            val user = User(
+                                userId = UserRepository.getCurrentUserId(),
+                                name = name,
+                                course = program,
+                                email = "" // Update this if you have the email from login
+                            )
+                            UserRepository.saveProfile(user)
+                            startActivity(Intent(this@ProfileActivity, MainActivity::class.java))
+                            finish()
+                        }
                     }
                 )
             }

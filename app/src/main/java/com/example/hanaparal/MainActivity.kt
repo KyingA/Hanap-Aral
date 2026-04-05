@@ -2,6 +2,7 @@ package com.example.hanaparal
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,7 +25,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             HanapAralTheme(dynamicColor = false) {
-                DashboardScreen()
+                DashboardScreen(
+                    onCreateClick = {
+                        startActivity(Intent(this, CreateGroupActivity::class.java))
+                    },
+                    onFindGroupClick = {
+                        startActivity(Intent(this, GroupListActivity::class.java))
+                    },
+                    onProfileClick = {
+                        startActivity(Intent(this, ProfileActivity::class.java))
+                    },
+                    onGroupClick = { groupId ->
+                        val intent = Intent(this, GroupDetailActivity::class.java)
+                        intent.putExtra("GROUP_ID", groupId)
+                        startActivity(intent)
+                    }
+                )
             }
         }
     }

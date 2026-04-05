@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        android:name=".HanapAralApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -33,6 +34,21 @@
             android:name=".ui.profile.ProfileActivity"
             android:exported="false"
             android:label="@string/app_name"
+            android:theme="@style/Theme.HanapAral" />
+        <activity
+            android:name=".ui.group.CreateGroupActivity"
+            android:exported="false"
+            android:label="Create Group"
+            android:theme="@style/Theme.HanapAral" />
+        <activity
+            android:name=".ui.group.GroupListActivity"
+            android:exported="false"
+            android:label="Find Groups"
+            android:theme="@style/Theme.HanapAral" />
+        <activity
+            android:name=".ui.group.GroupDetailActivity"
+            android:exported="false"
+            android:label="Group Details"
             android:theme="@style/Theme.HanapAral" />
     </application>
 

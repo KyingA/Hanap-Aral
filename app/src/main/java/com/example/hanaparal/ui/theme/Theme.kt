@@ -17,29 +17,29 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF9BB5E0),
-    secondary = Color(0xFF8AA4CC),
-    tertiary = Color(0xFF7B96BD),
-    background = Color(0xFF0F1A2E),
-    surface = Color(0xFF162240),
-    onPrimary = Color(0xFF0F1A2E),
-    onSecondary = Color.White,
-    onBackground = Color(0xFFE8ECF1),
-    onSurface = Color(0xFFE8ECF1)
+    primary = PrimaryDark,
+    secondary = SecondaryDark,
+    tertiary = TertiaryDark,
+    background = BackgroundDark,
+    surface = SurfaceDark,
+    error = ErrorDark,
+    onPrimary = OnPrimaryDark,
+    onSecondary = OnSecondaryDark,
+    onBackground = OnBackgroundDark,
+    onSurface = OnSurfaceDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = DarkNavy,
-    secondary = MediumNavy,
-    tertiary = LinkBlue,
-    background = Color(0xFFF5F7FA),
-    surface = Color.White,
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onBackground = DarkNavy,
-    onSurface = DarkNavy,
-    surfaceVariant = Color(0xFFF0F2F5),
-    onSurfaceVariant = SubtitleGray
+    primary = PrimaryLight,
+    secondary = SecondaryLight,
+    tertiary = TertiaryLight,
+    background = BackgroundLight,
+    surface = SurfaceLight,
+    error = ErrorLight,
+    onPrimary = OnPrimaryLight,
+    onSecondary = OnSecondaryLight,
+    onBackground = OnBackgroundLight,
+    onSurface = OnSurfaceLight
 )
 
 @Composable
@@ -57,7 +57,6 @@ fun HanapAralTheme(
         else -> LightColorScheme
     }
 
-    // Make status bar transparent for edge-to-edge
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
