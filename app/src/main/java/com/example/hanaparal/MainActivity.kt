@@ -12,11 +12,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import com.example.hanaparal.data.repository.NotificationRepository
 import com.example.hanaparal.ui.auth.LoginActivity
 import com.example.hanaparal.ui.screens.DashboardScreen
 import com.example.hanaparal.ui.theme.HanapAralTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import com.example.hanaparal.utils.FcmNotificationBridge
 
@@ -42,6 +44,9 @@ class MainActivity : ComponentActivity() {
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
             return
+        } else {
+            // Modern: Start real-time sync for notifications as soon as we're sure we have a user
+            NotificationRepository.startListening()
         }
 
         mainViewModel = ViewModelProvider(this)[MainViewModel::class.java]
@@ -56,6 +61,13 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
 
+        // 1. Subscribe to a global topic for everyone (offline announcements)
+        FirebaseMessaging.getInstance().subscribeToTopic("all_users")
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) Log.d("FCM", "Subscribed to all_users topic")
+            }
+
+        // 2. Manage User Token
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val token = task.result
@@ -65,7 +77,7 @@ class MainActivity : ComponentActivity() {
                     FirebaseFirestore.getInstance()
                         .collection("users")
                         .document(userId)
-                        .update("fcmToken", token)
+                        .set(mapOf("fcmToken" to token), SetOptions.merge())
                         .addOnFailureListener { e ->
                             Log.w("FCM", "Error updating token in Firestore", e)
                         }

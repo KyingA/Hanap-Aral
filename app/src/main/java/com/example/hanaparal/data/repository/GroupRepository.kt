@@ -8,10 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
 data class ChatMessage(
@@ -28,11 +25,6 @@ object GroupRepository {
     private val firestore = FirebaseFirestore.getInstance()
     private val groupsCollection = firestore.collection("groups")
 
-    /**
-     * Snapshot listeners must not use [kotlinx.coroutines.channels.SendChannel.close] with an error:
-     * after sign-out, rules return PERMISSION_DENIED and that would crash collectors (e.g. in
-     * [com.example.hanaparal.ui.group.GroupViewModel]). Emit an empty list instead.
-     */
     private fun logSnapshotError(where: String, error: Throwable) {
         val code = (error as? FirebaseFirestoreException)?.code?.name
         Log.w(TAG, "Firestore listener $where failed${if (code != null) " ($code)" else ""}", error)
@@ -92,6 +84,20 @@ object GroupRepository {
                 createdBy = createdBy
             )
             ref.set(item).await()
+
+            // NOTIFY ALL MEMBERS
+            val groupDoc = groupsCollection.document(groupId).get().await()
+            val group = groupDoc.toObject(StudyGroup::class.java)
+            group?.memberIds?.forEach { memberId ->
+                if (memberId != createdBy) {
+                    NotificationRepository.addNotificationForUser(
+                        memberId,
+                        "Announcement in ${group.name}",
+                        title.trim()
+                    )
+                }
+            }
+
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -124,6 +130,24 @@ object GroupRepository {
             text = text
         )
         docRef.set(newMessage).await()
+
+        // NOTIFY ALL MEMBERS (except sender)
+        val groupDoc = groupsCollection.document(groupId).get().await()
+        val group = groupDoc.toObject(StudyGroup::class.java)
+        
+        // Use "users" collection (standardized)
+        val senderDoc = firestore.collection("users").document(senderId).get().await()
+        val senderName = senderDoc.getString("fullname") ?: "A member"
+
+        group?.memberIds?.forEach { memberId ->
+            if (memberId != senderId) {
+                NotificationRepository.addNotificationForUser(
+                    memberId,
+                    "New message in ${group.name}",
+                    "$senderName: $text"
+                )
+            }
+        }
     }
 
     suspend fun createGroup(group: StudyGroup): Result<StudyGroup> {
@@ -144,7 +168,21 @@ object GroupRepository {
             val group = snapshot.toObject(StudyGroup::class.java) ?: throw Exception("Group not found")
             
             if (!group.memberIds.contains(userId)) {
+                // Use "users" collection (standardized)
+                val userDoc = firestore.collection("users").document(userId).get().await()
+                val userName = userDoc.getString("fullname") ?: "A new member"
+
+                // Update members
                 docRef.update("memberIds", group.memberIds + userId).await()
+
+                // NOTIFY ALL EXISTING MEMBERS (including admin)
+                group.memberIds.forEach { memberId ->
+                    NotificationRepository.addNotificationForUser(
+                        memberId,
+                        "New Member Joined!",
+                        "$userName has joined ${group.name}"
+                    )
+                }
             }
             Result.success(Unit)
         } catch (e: Exception) {

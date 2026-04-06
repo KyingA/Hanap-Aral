@@ -4,10 +4,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.fragment.app.FragmentActivity
 import com.example.hanaparal.MainActivity
 import com.example.hanaparal.R
 import com.example.hanaparal.data.model.UserProfile
@@ -15,6 +15,7 @@ import com.example.hanaparal.ui.profile.ProfileActivity
 import com.example.hanaparal.ui.screens.SignInScreen
 import com.example.hanaparal.ui.theme.HanapAralTheme
 import com.example.hanaparal.utils.LoginPreferences
+import com.example.hanaparal.utils.BiometricHelper
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -25,10 +26,9 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.hanaparal.utils.FcmNotificationBridge
 
-class LoginActivity : ComponentActivity() {
+class LoginActivity : FragmentActivity() {
 
     companion object {
-        /** Set from logout flow so we always show sign-in (and clear any stale session). */
         const val EXTRA_AFTER_LOGOUT = "com.example.hanaparal.EXTRA_AFTER_LOGOUT"
     }
 
@@ -46,72 +46,78 @@ class LoginActivity : ComponentActivity() {
                     Log.w("LoginActivity", "Google sign in failed", e)
                     Toast.makeText(this, "Sign in failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
-            } else {
-                Toast.makeText(this, "Sign in cancelled", Toast.LENGTH_SHORT).show()
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         FcmNotificationBridge.consumeInitialMessageAndIntent(this, intent)
-
         auth = FirebaseAuth.getInstance()
 
-        if (intent.getBooleanExtra(EXTRA_AFTER_LOGOUT, false)) {
-            auth.signOut()
-            try {
-                val gsoClear = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                    .requestIdToken(getString(R.string.default_web_client_id))
-                    .requestEmail()
-                    .build()
-                GoogleSignIn.getClient(applicationContext, gsoClear).signOut()
-            } catch (e: Exception) {
-                Log.w("LoginActivity", "Google sign-out after logout", e)
-            }
-        }
-
-        if (auth.currentUser != null) {
-            navigateAfterAuth()
-            return
-        }
-
+        // Initialize Google Sign In first so we can use it for silent sign-in
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
             .build()
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
-        val canUseEmail = LoginPreferences.canUseEmailPasswordLogin(this)
+        val isAfterLogout = intent.getBooleanExtra(EXTRA_AFTER_LOGOUT, false)
+        
+        if (isAfterLogout) {
+            auth.signOut()
+            // Flag that we can use biometrics for the next login
+            LoginPreferences.setBiometricEnabled(this, true)
+            googleSignInClient.signOut()
+        }
+
+        // Auto-navigate if already logged in and not just logged out
+        if (auth.currentUser != null && !isAfterLogout) {
+            navigateAfterAuth()
+            return
+        }
 
         enableEdgeToEdge()
         setContent {
             HanapAralTheme(dynamicColor = false) {
                 SignInScreen(
-                    canUseEmailPasswordLogin = canUseEmail,
-                    onGoogleSignInClick = {
-                        val signInIntent = googleSignInClient.signInIntent
-                        googleSignInLauncher.launch(signInIntent)
-                    },
+                    canUseEmailPasswordLogin = LoginPreferences.canUseEmailPasswordLogin(this),
+                    onGoogleSignInClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
                     onRestrictedEmailLoginClick = {
-                        Toast.makeText(
-                            this,
-                            "New accounts must sign in with Google first. After you complete your profile and set a password, you can use email sign-in next time.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        Toast.makeText(this, "Please sign in with Google first.", Toast.LENGTH_LONG).show()
                     },
                     onEmailPasswordSignIn = { email, password ->
                         auth.signInWithEmailAndPassword(email, password)
                             .addOnCompleteListener { task ->
-                                if (task.isSuccessful) {
-                                    navigateAfterAuth()
-                                } else {
-                                    val msg = formatFirebaseAuthError(task.exception)
-                                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-                                }
+                                if (task.isSuccessful) navigateAfterAuth()
+                                else Toast.makeText(this, formatFirebaseAuthError(task.exception), Toast.LENGTH_LONG).show()
                             }
                     }
                 )
+            }
+        }
+
+        // Show Biometric Prompt if the user just logged out or returns
+        if (LoginPreferences.isBiometricEnabled(this)) {
+            BiometricHelper(this).showBiometricPrompt(
+                title = "Welcome Back",
+                subtitle = "Authenticate to sign in quickly",
+                onSuccess = { 
+                    // Perform silent sign in so they don't have to pick account
+                    trySilentSignIn()
+                },
+                onError = { Log.d("Biometric", "Prompt hidden or failed: $it") }
+            )
+        }
+    }
+
+    private fun trySilentSignIn() {
+        googleSignInClient.silentSignIn().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val account = task.result
+                firebaseAuthWithGoogle(account.idToken!!)
+            } else {
+                // If silent sign-in fails, they just use the normal buttons
+                Log.w("LoginActivity", "Silent sign-in failed", task.exception)
             }
         }
     }
@@ -121,56 +127,27 @@ class LoginActivity : ComponentActivity() {
         auth.signInWithCredential(credential)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
+                    // Once logged in, biometrics is "ready" for the next logout
+                    LoginPreferences.setBiometricEnabled(this, true)
                     navigateAfterAuth()
                 } else {
-                    Toast.makeText(
-                        this,
-                        formatFirebaseAuthError(task.exception),
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this, formatFirebaseAuthError(task.exception), Toast.LENGTH_LONG).show()
                 }
             }
     }
 
-    /**
-     * Sends users with a completed Firestore profile to the app; others to [ProfileActivity].
-     */
     private fun navigateAfterAuth() {
-        val uid = auth.currentUser?.uid
-        if (uid == null) {
-            Toast.makeText(this, "Signed in, but user id is missing.", Toast.LENGTH_LONG).show()
-            return
-        }
+        val uid = auth.currentUser?.uid ?: return
         FirebaseFirestore.getInstance().collection("UserProfile").document(uid).get()
-            .addOnCompleteListener { task ->
-                if (!task.isSuccessful) {
-                    startActivity(Intent(this, ProfileActivity::class.java))
-                    finish()
-                    return@addOnCompleteListener
-                }
-                val doc = task.result
-                val profile = doc?.toObject(UserProfile::class.java)
-                val hasProfile =
-                    doc?.exists() == true && profile?.fullname?.isNotBlank() == true
-                if (hasProfile) {
-                    startActivity(Intent(this, MainActivity::class.java))
-                } else {
-                    startActivity(Intent(this, ProfileActivity::class.java))
-                }
+            .addOnSuccessListener { doc ->
+                val hasProfile = doc.exists() && doc.getString("fullname")?.isNotBlank() == true
+                val destination = if (hasProfile) MainActivity::class.java else ProfileActivity::class.java
+                startActivity(Intent(this, destination))
                 finish()
             }
     }
 
     private fun formatFirebaseAuthError(e: Exception?): String {
-        val fe = e as? FirebaseAuthException
-        return when (fe?.errorCode) {
-            "ERROR_INVALID_EMAIL" -> "That email address looks invalid."
-            "ERROR_WRONG_PASSWORD" -> "Wrong password. Try again."
-            "ERROR_INVALID_CREDENTIAL" -> "Wrong email or password."
-            "ERROR_USER_NOT_FOUND" -> "No account found for this email. Sign in with Google to create one."
-            "ERROR_USER_DISABLED" -> "This account has been disabled."
-            "ERROR_TOO_MANY_REQUESTS" -> "Too many attempts. Try again later."
-            else -> fe?.message ?: e?.message ?: "Authentication failed."
-        }
+        return (e as? FirebaseAuthException)?.message ?: e?.message ?: "Authentication failed."
     }
 }

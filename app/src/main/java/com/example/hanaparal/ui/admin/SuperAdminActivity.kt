@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -129,30 +131,43 @@ fun AdminControlScreen(
                 fontWeight = FontWeight.Bold
             )
 
+            // Explicit Enable/Disable Section
             AdminSettingCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Enable Group Creation", color = DarkNavy, fontWeight = FontWeight.Medium)
-                        Text(
-                            "Allow users to create new study groups",
-                            color = SubtitleGray,
-                            fontSize = 12.sp
-                        )
-                    }
-                    Switch(
-                        checked = isGroupCreationEnabled,
-                        onCheckedChange = { isGroupCreationEnabled = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = DarkNavy,
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = Color(0xFFE5E7EB)
-                        )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Group Creation Status", color = DarkNavy, fontWeight = FontWeight.Medium)
+                    Text(
+                        "Current status: ${if (isGroupCreationEnabled) "ENABLED" else "DISABLED"}",
+                        color = if (isGroupCreationEnabled) Color(0xFF4C705B) else Color(0xFFDC2626),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = { isGroupCreationEnabled = true },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isGroupCreationEnabled) Color(0xFF4C705B) else Color(0xFFE5E7EB)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Enable", color = if (isGroupCreationEnabled) Color.White else Color.Gray)
+                        }
+                        Button(
+                            onClick = { isGroupCreationEnabled = false },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (!isGroupCreationEnabled) Color(0xFFDC2626) else Color(0xFFE5E7EB)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.Block, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Disable", color = if (!isGroupCreationEnabled) Color.White else Color.Gray)
+                        }
+                    }
                 }
             }
 
@@ -210,7 +225,7 @@ fun AdminControlScreen(
                     )
                     Toast.makeText(
                         context,
-                        "Saved on this device. Mirror these keys in Firebase Remote Config for all users.",
+                        "Configuration applied locally!",
                         Toast.LENGTH_LONG
                     ).show()
                     onBack()

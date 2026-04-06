@@ -19,14 +19,20 @@ object AppNotificationHelper {
     private const val CHANNEL_ID = "hanaparal_notifications"
 
     /**
-     * Adds to [NotificationRepository] and shows a system notification when permitted (Android 13+).
+     * Adds to [NotificationRepository] and shows a system notification.
      */
     fun show(context: Context, title: String, body: String) {
         if (title.isBlank() && body.isBlank()) return
         val safeTitle = title.ifBlank { "HanapAral" }
         val safeBody = body.ifBlank { "" }
         NotificationRepository.addNotification(safeTitle, safeBody)
+        showTrayOnly(context, safeTitle, safeBody)
+    }
 
+    /**
+     * Shows only the system tray notification without adding to repository.
+     */
+    fun showTrayOnly(context: Context, title: String, body: String) {
         val intent = Intent(context, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
@@ -59,9 +65,9 @@ object AppNotificationHelper {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_book)
-            .setContentTitle(safeTitle)
-            .setContentText(safeBody)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(safeBody))
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setDefaults(NotificationCompat.DEFAULT_ALL)

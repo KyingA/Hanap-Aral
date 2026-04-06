@@ -33,6 +33,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -59,6 +60,9 @@ import com.example.hanaparal.MainViewModel
 import com.example.hanaparal.ui.admin.SuperAdminActivity
 import com.example.hanaparal.ui.profile.ProfileViewModel
 import com.google.firebase.auth.FirebaseAuth
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,8 +113,6 @@ fun DashboardScreen(
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                             putExtra(LoginActivity.EXTRA_AFTER_LOGOUT, true)
                         }
-                        // Do not call finish(); CLEAR_TASK already tears down this activity.
-                        // Calling finish() here can crash on some devices during the transition.
                         activity.startActivity(intent)
                     }
                 }
@@ -189,13 +191,13 @@ fun DashboardContent(
                     ) {
                         BadgedBox(
                             badge = {
-                                if (notifications.isNotEmpty()) {
-                                    val unread = notifications.count { !it.isRead }
+                                val unreadCount = notifications.count { !it.isRead }
+                                if (unreadCount > 0) {
                                     Badge(
-                                        containerColor = if (unread > 0) Color(0xFFDC2626) else Color(0xFF6B7280)
+                                        containerColor = Color(0xFFDC2626)
                                     ) {
                                         Text(
-                                            text = if (notifications.size > 99) "99+" else notifications.size.toString(),
+                                            text = if (unreadCount > 99) "99+" else unreadCount.toString(),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color.White
                                         )
@@ -604,40 +606,123 @@ fun DashboardContent(
         }
 
         if (showNotificationsDialog) {
-            AlertDialog(
-                onDismissRequest = { showNotificationsDialog = false },
-                title = { Text("Notifications") },
-                text = {
-                    if (notifications.isEmpty()) {
-                        Text(
-                            "No messages yet. Send a test from Firebase Console → Messaging (Cloud Messaging). " +
-                                "On Android 13+, allow notifications when the app asks.",
-                            fontSize = 14.sp
-                        )
-                    } else {
-                        Column(
-                            modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())
-                        ) {
-                            notifications.forEach { n ->
-                                Text(n.title, fontWeight = FontWeight.Bold)
-                                Text(n.body, fontSize = 13.sp, color = Color(0xFF6B7280))
-                                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            NotificationRepository.markAllAsRead()
-                            showNotificationsDialog = false
-                        }
-                    ) { Text("Mark all read") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showNotificationsDialog = false }) { Text("Close") }
-                }
+            NotificationDialog(
+                notifications = notifications,
+                onDismiss = { showNotificationsDialog = false },
+                onMarkAsRead = { NotificationRepository.markAsRead(it) },
+                onMarkAllRead = { NotificationRepository.markAllAsRead() }
             )
+        }
+    }
+}
+
+@Composable
+fun NotificationDialog(
+    notifications: List<com.example.hanaparal.data.repository.NotificationItem>,
+    onDismiss: () -> Unit,
+    onMarkAsRead: (String) -> Unit,
+    onMarkAllRead: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Notifications", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                if (notifications.any { !it.isRead }) {
+                    TextButton(onClick = onMarkAllRead) {
+                        Text("Mark all read", fontSize = 12.sp)
+                    }
+                }
+            }
+        },
+        text = {
+            if (notifications.isEmpty()) {
+                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.NotificationsNone, null, modifier = Modifier.size(48.dp), tint = Color.Gray)
+                        Spacer(Modifier.height(8.dp))
+                        Text("No notifications", color = Color.Gray)
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    notifications.forEach { notification ->
+                        NotificationItemRow(notification, onMarkAsRead)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        },
+        shape = RoundedCornerShape(24.dp)
+    )
+}
+
+@Composable
+fun NotificationItemRow(
+    notification: com.example.hanaparal.data.repository.NotificationItem,
+    onMarkAsRead: (String) -> Unit
+) {
+    val timeFormat = SimpleDateFormat("MMM d, HH:mm", Locale.getDefault())
+    val timeString = timeFormat.format(Date(notification.timestamp))
+
+    Surface(
+        color = if (notification.isRead) Color.Transparent else Color(0xFFF3F4F6),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (notification.isRead) Color.Transparent else Color(0xFFDC2626))
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    notification.title,
+                    fontWeight = if (notification.isRead) FontWeight.Medium else FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = DarkNavy
+                )
+                Text(
+                    notification.body,
+                    fontSize = 12.sp,
+                    color = Color.DarkGray,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    timeString,
+                    fontSize = 10.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            if (!notification.isRead) {
+                IconButton(onClick = { onMarkAsRead(notification.id) }) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = "Mark as read",
+                        tint = Color(0xFF4C705B),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -785,7 +870,7 @@ fun DynamicSuggestedCard(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(group.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(group.description.ifEmpty { group.formattedSchedule }, fontSize = 13.sp, color = Color(0xFF6B7280), lineHeight = 18.sp, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text(group.description.ifEmpty { group.formattedSchedule }, fontSize = 13.sp, color = Color(0xFF6B7280), lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 
                 Spacer(modifier = Modifier.height(20.dp))
                 

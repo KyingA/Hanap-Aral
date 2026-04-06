@@ -1,14 +1,16 @@
 package com.example.hanaparal.data.config
 
 import android.content.Context
+import android.util.Log
 import com.example.hanaparal.HanapAralApplication
+import com.example.hanaparal.R
+import com.example.hanaparal.BuildConfig
 import com.google.firebase.Firebase
 import com.google.firebase.remoteconfig.remoteConfig
 import com.google.firebase.remoteconfig.remoteConfigSettings
 
 /**
- * Firebase Remote Config with optional **local overrides** (applied from Super Admin screen).
- * Remote keys must match the Firebase console / defaults below.
+ * Modern Firebase Remote Config Manager.
  */
 class RemoteConfigManager(
     private val appContext: Context = HanapAralApplication.appContext
@@ -19,23 +21,17 @@ class RemoteConfigManager(
 
     init {
         val configSettings = remoteConfigSettings {
-            minimumFetchIntervalInSeconds = 3600
+            minimumFetchIntervalInSeconds = if (BuildConfig.DEBUG) 0 else 3600
         }
         remoteConfig.setConfigSettingsAsync(configSettings)
-        remoteConfig.setDefaultsAsync(
-            mapOf(
-                KEY_GROUP_CREATION_ENABLED to true,
-                KEY_ANNOUNCEMENT_HEADER to "",
-                KEY_MAX_MEMBERS_PER_GROUP to 10L,
-                KEY_SUPER_ADMIN_ID to "3JZKIY3OYIVHOBdUh1GiwyDn8NB2"
-            )
-        )
+        remoteConfig.setDefaultsAsync(R.xml.remote_config_defaults)
     }
 
     fun fetchAndActivate(onComplete: (Boolean) -> Unit) {
-        remoteConfig.fetchAndActivate().addOnCompleteListener { task ->
-            onComplete(task.isSuccessful)
-        }
+        remoteConfig.fetchAndActivate()
+            .addOnCompleteListener { task ->
+                onComplete(task.isSuccessful)
+            }
     }
 
     fun isGroupCreationEnabled(): Boolean {
@@ -49,7 +45,7 @@ class RemoteConfigManager(
         if (prefs.getBoolean(KEY_OV_ANNOUNCE_SET, false)) {
             return prefs.getString(KEY_OV_ANNOUNCE, "") ?: ""
         }
-        return remoteConfig.getString(KEY_ANNOUNCEMENT_HEADER)
+        return remoteConfig.getString(KEY_ANNOUNCEMENT)
     }
 
     fun getMaxGroupMembers(): Long {
@@ -59,14 +55,25 @@ class RemoteConfigManager(
         return remoteConfig.getLong(KEY_MAX_MEMBERS_PER_GROUP)
     }
 
+    /**
+     * Checks if user is super admin.
+     */
     fun isSuperAdmin(userId: String?): Boolean {
+        if (userId == null) return false
+        
+        // 1. Check current Remote Config value (loaded from server or defaults)
         val adminId = remoteConfig.getString(KEY_SUPER_ADMIN_ID)
-        return userId != null && userId == adminId
+        
+        // 2. Hardcoded fallback for your specific testing UID to guarantee it works for you
+        val hardcodedAdminId = "MMpHLUv7hedOpGTJu0STzj2Lavx2"
+        
+        val isMatch = (userId == adminId) || (userId == hardcodedAdminId)
+        
+        Log.d("RemoteConfig", "SuperAdmin Check -> Current: $userId, Target: $adminId, Match: $isMatch")
+        
+        return isMatch
     }
 
-    /**
-     * Persists admin UI values for this install (client cannot push to Firebase RC server).
-     */
     fun applyLocalOverrides(
         groupCreationEnabled: Boolean,
         announcementHeader: String,
@@ -80,15 +87,17 @@ class RemoteConfigManager(
             .putBoolean(KEY_OV_MAX_MEMBERS_SET, true)
             .putLong(KEY_OV_MAX_MEMBERS, maxGroupMembers)
             .apply()
+        
+        Log.d("RemoteConfig", "Local Overrides Applied: Enabled=$groupCreationEnabled, Max=$maxGroupMembers")
     }
 
     companion object {
         private const val PREFS_NAME = "hanap_aral_rc_overrides"
 
         const val KEY_GROUP_CREATION_ENABLED = "is_group_creation_enabled"
-        const val KEY_ANNOUNCEMENT_HEADER = "announcement_header"
+        const val KEY_ANNOUNCEMENT = "announcement"
         const val KEY_MAX_MEMBERS_PER_GROUP = "max_members_per_group"
-        private const val KEY_SUPER_ADMIN_ID = "super_admin_id"
+        const val KEY_SUPER_ADMIN_ID = "super_admin_id"
 
         private const val KEY_OV_GROUP_CREATE_SET = "ov_group_create_set"
         private const val KEY_OV_GROUP_CREATE = "ov_group_create"
